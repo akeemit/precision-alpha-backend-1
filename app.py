@@ -517,6 +517,117 @@ def update_settings():
     log_scan(f"⚙️ Settings updated: {updated}")
     return jsonify({"status": "updated", "rules": RULES})
 
+
+# Win Rate Tracker
+@app.route("/api/trades/history")
+def get_trade_history():
+    """Get closed orders and calculate win rate stats"""
+    try:
+        res = requests.get(
+            f"{ALPACA_BASE_URL}/orders?status=closed&limit=100&direction=desc",
+            headers=alpaca_hdrs(), timeout=10
+        )
+        if not res.ok:
+            return jsonify({"error": "Failed to fetch orders"}), 500
+        
+        orders = res.json()
+        
+        # Filter only filled sell orders
+        sells = [o for o in orders if o.get('side') == 'sell' and o.get('status') == 'filled']
+        buys = {o.get('symbol'): o for o in orders if o.get('side') == 'buy' and o.get('status') == 'filled'}
+        
+        trades = []
+        wins = 0
+        losses = 0
+        total_gain = 0
+        total_loss = 0
+        
+        for sell in sells:
+            symbol = sell.get('symbol')
+            sell_price = float(sell.get('filled_avg_price') or 0)
+            qty = float(sell.get('filled_qty') or 0)
+            
+            # Find matching buy
+            buy = buys.get(symbol)
+            if not buy:
+                continue
+                
+            buy_price = float(buy.get('filled_avg_price') or 0)
+            if not buy_price or not sell_price:
+                continue
+                
+            pl = (sell_price - buy_price) * qty
+            pct = ((sell_price - buy_price) / buy_price) * 100
+            
+            trade = {
+                'symbol': symbol,
+                'buy_price': buy_price,
+                'sell_price': sell_price,
+                'qty': qty,
+                'pl': round(pl, 2),
+                'pct': round(pct, 2),
+                'win': pl > 0,
+                'date': sell.get('filled_at', '')[:10] if sell.get('filled_at') else '',
+            }
+            trades.append(trade)
+            
+            if pl > 0:
+                wins += 1
+                total_gain += pl
+            else:
+                losses += 1
+                total_loss += abs(pl)
+        
+        total_trades = wins + losses
+        win_rate = round((wins / total_trades * 100), 1) if total_trades > 0 else 0
+        avg_gain = round(total_gain / wins, 2) if wins > 0 else 0
+        avg_loss = round(total_loss / losses, 2) if losses > 0 else 0
+        reward_risk = round(avg_gain / avg_loss, 2) if avg_loss > 0 else 0
+        
+        return jsonify({
+            'trades': trades[:50],
+            'stats': {
+                'total_trades': total_trades,
+                'wins': wins,
+                'losses': losses,
+                'win_rate': win_rate,
+                'avg_gain': avg_gain,
+                'avg_loss': avg_loss,
+                'reward_risk': reward_risk,
+                'total_pl': round(total_gain - total_loss, 2),
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/news/<symbol>")
+def get_news(symbol):
+    """Get latest news for a stock symbol"""
+    try:
+        res = requests.get(
+            f"https://data.alpaca.markets/v1beta1/news?symbols={symbol}&limit=5",
+            headers=alpaca_hdrs(), timeout=10
+        )
+        if res.ok:
+            return jsonify(res.json()), 200
+        return jsonify({"news": []}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/news/market")
+def get_market_news():
+    """Get latest general market news"""
+    try:
+        res = requests.get(
+            f"https://data.alpaca.markets/v1beta1/news?limit=10",
+            headers=alpaca_hdrs(), timeout=10
+        )
+        if res.ok:
+            return jsonify(res.json()), 200
+        return jsonify({"news": []}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Benchmark state — persists in memory (resets on server restart)
 benchmark_state = {
     'real_value': 0.0,

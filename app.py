@@ -1,668 +1,1272 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os, requests, json, threading, time, logging, re
-from datetime import datetime, timedelta
-import pytz
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Precision Alpha AI X24-X26</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#05070b;--panel:#0d1117;--panel2:#10151d;--line:#202838;--text:#f7f7f7;--muted:#a8b0bd;--gold:#d4a22f;--green:#67ff74;--red:#ff4f4f;--yellow:#ffd600}
+body{margin:0;background:radial-gradient(circle at top right,#151922 0,#05070b 48%,#020305 100%);color:var(--text);font-family:Inter,Arial,Helvetica,sans-serif;display:flex;min-height:100vh}
+.sidebar{width:270px;background:#070a0f;border-right:1px solid var(--line);padding:26px 20px;position:fixed;top:0;bottom:0;left:0;overflow:auto;display:flex;flex-direction:column}
+.badge{width:42px;height:42px;border:2px solid var(--gold);border-radius:12px;color:var(--gold);display:grid;place-items:center;font-weight:900;margin-bottom:14px}
+.sidebar h1{font-size:30px;line-height:.95;margin:0 0 8px;font-weight:900}
+.version{color:var(--muted);font-size:13px;margin:0 0 22px}
+.nav{display:block;width:100%;padding:12px 14px;margin:5px 0;background:transparent;color:var(--text);border:1px solid transparent;border-radius:13px;text-align:left;font-weight:800;cursor:pointer;font-size:13px}
+.nav.active,.nav:hover{border-color:var(--gold);background:rgba(212,162,47,.08);color:#fff}
+.kill-wrap{margin-top:auto;padding-top:16px}
+.kill{width:100%;padding:12px 14px;background:rgba(255,79,79,.1);color:var(--red);border:1px solid rgba(255,79,79,.3);border-radius:13px;font-weight:900;cursor:pointer;font-size:13px}
+.kill:hover{background:rgba(255,79,79,.2)}
+.main{margin-left:270px;min-height:100vh;width:calc(100% - 270px);padding:38px 44px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;flex-wrap:wrap;gap:10px}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.phase{display:inline-block;border:1px solid var(--gold);color:var(--gold);padding:8px 14px;border-radius:999px;font-size:13px;font-weight:900;letter-spacing:.03em}
+.status-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);animation:blink 2s infinite}
+.status-dot.red{background:var(--red);box-shadow:0 0 7px var(--red);animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.acct{font-size:13px;color:var(--muted)}
+.acct strong{color:var(--green)}
+.acct strong.loss{color:var(--red)}
+.refresh,.gold{background:linear-gradient(180deg,#f2bf4b,#c88d1f);border:0;color:#111;padding:12px 18px;border-radius:13px;font-weight:900;cursor:pointer;font-size:13px}
+.btn-submit{background:linear-gradient(180deg,#7fff8a,#3dd44a);border:0;color:#0a1a0a;padding:13px 18px;border-radius:13px;font-weight:900;cursor:pointer;font-size:14px;width:100%;margin-top:8px}
+.dark{background:#151a23;color:#fff;border:1px solid #343b4b;padding:12px 18px;border-radius:13px;font-weight:900;cursor:pointer;margin-left:8px}
+.view{display:none}.view.active{display:block}
+h2{font-size:44px;margin:0 0 28px;letter-spacing:-.04em;font-weight:900}
+.statgrid,.cardgrid{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:18px;margin-bottom:26px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}
+.stat,.card,.panel,.hero{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 20px 80px rgba(0,0,0,.18)}
+.stat span,.card span,label{display:block;color:var(--muted);font-size:13px;font-weight:800;margin-bottom:8px}
+.stat strong,.card strong{display:block;color:var(--green);font-size:28px;line-height:1;font-weight:900;margin-bottom:8px}
+.stat small,.card p,.hero p{color:var(--muted);font-size:14px;line-height:1.35}
+.hero{margin-bottom:26px;padding:28px 32px}
+.hero h3{font-size:24px;line-height:1.17;margin:0 0 14px;max-width:1000px}
+.panel{margin-bottom:22px}
+.panel h3{margin:0 0 14px;font-size:20px;font-weight:900}
+.panel-title{font-size:15px;font-weight:900;margin-bottom:14px;color:var(--text)}
+input,select{width:100%;padding:13px 14px;margin:0 0 16px;background:#080b11;color:#fff;border:1px solid #2b3445;border-radius:13px;font-size:14px;font-family:inherit}
+input[type=range]{padding:4px 0;accent-color:var(--gold)}
+input:focus,select:focus{outline:none;border-color:var(--gold)}
+.notes,.log{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.note,.logitem{background:#111722;border:1px solid #2c3546;border-radius:14px;padding:13px;margin:0;color:#eef2f6;font-size:13px}
+.note.good{border-color:rgba(103,255,116,.3);background:rgba(103,255,116,.04)}
+.note.warn{border-color:rgba(255,214,0,.3);background:rgba(255,214,0,.04)}
+.note.bad{border-color:rgba(255,79,79,.3);background:rgba(255,79,79,.04)}
+#feed,#replayLog,#journalLog{display:grid;gap:9px}
+.rule-list{display:flex;flex-direction:column;gap:0}
+.rule{display:flex;align-items:center;gap:10px;font-size:13px;padding:10px 0;border-bottom:1px solid #161c28}
+.rule:last-child{border-bottom:none}
+.rule-dot{width:8px;height:8px;border-radius:50%;background:#333;flex-shrink:0}
+.rule.ok .rule-dot{background:var(--green)}
+.rule.warn .rule-dot{background:var(--yellow)}
+.rule.bad .rule-dot{background:var(--red)}
+.rule-val{margin-left:auto;font-size:12px;font-weight:800;color:#555}
+.rule.ok .rule-val{color:var(--green)}
+.rule.warn .rule-val{color:var(--yellow)}
+.rule.bad .rule-val{color:var(--red)}
+.gate-result{margin:12px 0;padding:14px 16px;border-radius:14px;font-weight:800;font-size:14px;display:none;line-height:1.6}
+.gate-result.green{background:rgba(103,255,116,.07);border:1px solid rgba(103,255,116,.3);color:var(--green)}
+.gate-result.yellow{background:rgba(255,214,0,.07);border:1px solid rgba(255,214,0,.3);color:var(--yellow)}
+.gate-result.red{background:rgba(255,79,79,.07);border:1px solid rgba(255,79,79,.3);color:var(--red)}
+.quote-symbol{font-size:26px;font-weight:900;color:var(--gold)}
+.quote-price{font-size:40px;font-weight:900;margin:6px 0}
+.quote-sub{color:var(--muted);font-size:12px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:8px 10px;color:var(--muted);font-size:11px;border-bottom:1px solid var(--line);font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.tbl td{padding:10px;border-bottom:1px solid #0d1018;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.badge-pill{display:inline-block;padding:3px 9px;border-radius:8px;font-size:11px;font-weight:900}
+.badge-pill.buy{background:rgba(103,255,116,.15);color:var(--green)}
+.badge-pill.sell{background:rgba(255,79,79,.15);color:var(--red)}
+.badge-pill.filled{background:rgba(212,162,47,.15);color:var(--gold)}
+.badge-pill.pending,.badge-pill.accepted{background:rgba(168,176,189,.1);color:var(--muted)}
+.ai-loading{background:#111722;border:1px solid #2c3546;border-radius:14px;padding:18px;color:var(--muted);font-size:13px;text-align:center}
+.ai-box{border-radius:16px;padding:20px;margin-top:4px}
+.ai-box.good{background:rgba(103,255,116,.06);border:1px solid rgba(103,255,116,.3)}
+.ai-box.warn{background:rgba(255,214,0,.06);border:1px solid rgba(255,214,0,.3)}
+.ai-box.bad{background:rgba(255,79,79,.06);border:1px solid rgba(255,79,79,.3)}
+.ai-header{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px}
+.ai-body{font-size:13px;line-height:1.8;color:#eef2f6}
+.sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.sum-item{background:#080b11;border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center}
+.sum-item span{display:block;font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+.sum-item strong{font-size:24px;font-weight:900;color:var(--green)}
+.sum-item strong.loss{color:var(--red)}
+.sum-item strong.neutral{color:var(--gold)}
+.toast{position:fixed;bottom:24px;right:24px;background:#0d1117;border:1px solid var(--line);border-radius:16px;padding:14px 20px;font-size:13px;font-weight:800;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999;max-width:340px}
+.toast.show{opacity:1}
+.toast.success{border-color:rgba(103,255,116,.4);color:var(--green)}
+.toast.error{border-color:rgba(255,79,79,.4);color:var(--red)}
+.toast.warn{border-color:rgba(255,214,0,.4);color:var(--yellow)}
+.wtag{display:inline-flex;align-items:center;background:#151a23;border:1px solid #343b4b;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--gold);margin:3px}
+@media(max-width:900px){body{display:block}.sidebar{position:relative;width:100%;height:auto;flex-direction:row;flex-wrap:wrap}.main{margin-left:0;width:100%;padding:24px}.statgrid,.cardgrid,.grid2{grid-template-columns:1fr}h2{font-size:34px}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="badge">PA</div>
+  <h1>Precision<br>Alpha AI</h1>
+  <p class="version">X24-X26 Institutional Execution Intelligence Suite</p>
+  <button class="nav active" data-view="environment">Environment</button>
+  <button class="nav" data-view="trade">Place Trade</button>
+  <button class="nav" data-view="auto">🤖 Auto Engine</button>
+  <button class="nav" data-view="congress">🏛️ Congress Engine</button>
+  <button class="nav" data-view="winrate">📊 Win Rate</button>
+  <button class="nav" data-view="news">📰 News Feed</button>
+  <button class="nav" data-view="settings">⚙️ Settings</button>
+  <button class="nav" data-view="manualtrade">📈 Manual Trade</button>
+  <button class="nav" data-view="benchmark">📊 Benchmark</button>
+  <button class="nav" data-view="replay">Replay Lab</button>
+  <button class="nav" data-view="mistakes">Mistake Tags</button>
+  <button class="nav" data-view="confidence">Confidence Decay</button>
+  <button class="nav" data-view="journal">Trade Journal</button>
+  <button class="nav" data-view="route">X24 Route Intelligence</button>
+  <button class="nav" data-view="volatility">X25 Volatility Containment</button>
+  <button class="nav" data-view="sync">X26 Synchronization</button>
+  <button class="nav" data-view="gate">Execution Gate</button>
+  <button class="nav" data-view="log">Trade Log</button>
+  <div class="kill-wrap">
+    <button id="killBtn" class="kill">⛔ KILL SWITCH</button>
+  </div>
+</aside>
 
-app = Flask(__name__)
-CORS(app, origins=["https://precision-alpha-ai.netlify.app", "*"])
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div id="statusDot" class="status-dot"></div>
+      <span class="phase" id="statusPhase">X24-X26 • PAPER SAFE</span>
+    </div>
+    <div class="topbar-right">
+      <span class="acct">Balance: <strong id="topBal">Loading...</strong></span>
+      <span class="acct">P&L: <strong id="topPL">$0.00</strong></span>
+      <button class="refresh" id="refreshBtn">Refresh</button>
+    </div>
+  </div>
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+  <section id="environment" class="view active">
+    <h2>Environment</h2>
+    <div class="statgrid">
+      <div class="stat"><span>Account Value</span><strong id="dashBal">--</strong><small>Paper trading balance</small></div>
+      <div class="stat"><span>Today P&L</span><strong id="dashPL">$0.00</strong><small>Daily limit: $30.00</small></div>
+      <div class="stat"><span>Trades This Week</span><strong id="dashTrades">0 / 10</strong><small>No weekly limit</small></div>
+      <div class="stat"><span>System Mode</span><strong>PAPER SAFE</strong><small>Live execution disabled</small></div>
+    </div>
+    <div class="hero">
+      <h3>Institutional execution intelligence suite combining autonomous route intelligence, volatility containment, replay enforcement, execution gates, and synchronization scoring — now connected to Alpaca paper trading.</h3>
+      <p>X24-X26 enforces all safety rules automatically. $30 daily loss limit · 3 trades/week · 9:30am–4pm EST only.</p>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">🛡️ Safety Rules</div>
+        <div class="rule-list">
+          <div class="rule" id="rule-daily"><span class="rule-dot"></span><span>Daily loss limit: $50.00</span><span id="rule-daily-val" class="rule-val">--</span></div>
+          <div class="rule" id="rule-trades"><span class="rule-dot"></span><span>Unlimited trades</span><span id="rule-trades-val" class="rule-val">--</span></div>
+          <div class="rule" id="rule-time"><span class="rule-dot"></span><span>Trading hours 9:30am–4pm EST</span><span id="rule-time-val" class="rule-val">--</span></div>
+          <div class="rule" id="rule-conf"><span class="rule-dot"></span><span>Min confidence score: 30</span><span id="rule-conf-val" class="rule-val">--</span></div>
+          <div class="rule" id="rule-vol"><span class="rule-dot"></span><span>Max volatility pressure: 90</span><span id="rule-vol-val" class="rule-val">--</span></div>
+          <div class="rule" id="rule-sync"><span class="rule-dot"></span><span>Min sync score: 30</span><span id="rule-sync-val" class="rule-val">--</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📡 Open Positions</div>
+        <div id="positionsList"><p style="color:var(--muted);font-size:13px">Loading positions...</p></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📋 Recent Orders</div>
+      <div id="recentOrders"><p style="color:var(--muted);font-size:13px">Loading orders...</p></div>
+    </div>
+    <div class="panel">
+      <h3>Execution Intelligence Feed</h3>
+      <div id="feed"></div>
+    </div>
+  </section>
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ALPACA_KEY        = os.environ.get("ALPACA_KEY", "")
-ALPACA_SECRET     = os.environ.get("ALPACA_SECRET", "")
-ALPACA_BASE_URL   = os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets/v2")
-ALPACA_DATA_URL   = "https://data.alpaca.markets/v2"
-EMAILJS_SERVICE   = os.environ.get("EMAILJS_SERVICE", "service_rucosmz")
-EMAILJS_TEMPLATE  = os.environ.get("EMAILJS_TEMPLATE", "template_qajvk5t")
-EMAILJS_PUBLIC    = os.environ.get("EMAILJS_PUBLIC", "i9a72iQL0ChaDHoZL")
-ALERT_EMAIL       = os.environ.get("ALERT_EMAIL", "pinnacleperformancetax@gmail.com")
+  <section id="trade" class="view">
+    <h2>Place Paper Trade</h2>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">Trade Setup</div>
+        <label>Stock Symbol</label>
+        <input type="text" id="tradeSymbol" placeholder="e.g. AAPL, TSLA, SPY"/>
+        <label>Action</label>
+        <select id="tradeAction"><option value="buy">BUY</option><option value="sell">SELL</option></select>
+        <label>Quantity (shares)</label>
+        <input type="number" id="tradeQty" value="1" min="1"/>
+        <label>Order Type</label>
+        <select id="tradeOrderType"><option value="market">Market Order</option><option value="limit">Limit Order</option></select>
+        <div id="limitPriceGroup" style="display:none">
+          <label>Limit Price ($)</label>
+          <input type="number" id="tradeLimitPrice" step="0.01" placeholder="0.00"/>
+        </div>
+        <label>X24 Confidence Score &nbsp;<strong id="tradeConfidenceVal" style="color:var(--gold)">75</strong></label>
+        <input type="range" min="0" max="100" value="75" id="tradeConfidence"/>
+        <label>X25 Volatility Pressure &nbsp;<strong id="tradeVolatilityVal" style="color:var(--gold)">50</strong></label>
+        <input type="range" min="0" max="100" value="50" id="tradeVolatility"/>
+        <label>X26 Sync Score &nbsp;<strong id="tradeSyncVal" style="color:var(--gold)">80</strong></label>
+        <input type="range" min="0" max="100" value="80" id="tradeSyncScore"/>
+        <label>🧠 AI Trading Style</label>
+        <select id="tradeStyle">
+          <option value="Momentum">🏃 Momentum — Ride strong moving stocks</option>
+          <option value="Mean Reversion">🔄 Mean Reversion — Buy dips, sell spikes</option>
+          <option value="Breakout">💥 Breakout — Enter on key level breaks</option>
+          <option value="Conservative">🐢 Conservative — Only highest confidence</option>
+          <option value="Aggressive">⚡ Aggressive — Higher risk, higher reward</option>
+        </select>
+        <div id="tradeGateResult" class="gate-result"></div>
+        <button class="gold" id="checkGateBtn" style="width:100%">🔍 Check Gate + AI Analysis</button>
+        <button class="btn-submit" id="submitTradeBtn" style="display:none">⚡ Submit Paper Trade</button>
+      </div>
+      <div>
+        <div class="panel">
+          <div class="panel-title">📊 Live Quote</div>
+          <div id="quoteBox"><p style="color:var(--muted);font-size:13px">Enter a symbol and check the gate to see a live quote.</p></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">⚠️ Risk Calculator</div>
+          <div id="riskBox"><p style="color:var(--muted);font-size:13px">Set quantity to calculate risk.</p></div>
+        </div>
+        <div id="aiAnalysisBox" style="display:none"></div>
+      </div>
+    </div>
+  </section>
 
-MARKET_SCAN_LIST = ['AAPL','TSLA','NVDA','SPY','QQQ','MSFT','AMD','META','GOOGL','AMZN','NFLX','SOFI','PLTR','RIVN','COIN','SMCI','ARM','UBER','ORCL','JPM','V','DIS','BAC','CRM','PANW']
+  <section id="auto" class="view">
+    <h2>🤖 Auto Execution Engine</h2>
+    <div class="grid2">
+      <div class="panel">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div id="autoDot" style="width:10px;height:10px;border-radius:50%;background:#a8b0bd;flex-shrink:0"></div>
+          <strong id="autoStatus" style="font-size:13px;color:var(--muted)">AUTO ENGINE STOPPED</strong>
+        </div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.6">Scans your watchlist + top market stocks every 5 minutes during trading hours. When all safety rules are met, places a paper trade automatically and emails you.</p>
+        <div style="background:#070a0f;border:1px solid #202838;border-radius:12px;padding:14px;margin-bottom:16px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Scan frequency</span><strong>Every 5 minutes</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Alert email</span><strong style="font-size:11px">pinnacleperformancetax@gmail.com</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Daily loss limit</span><strong>$50</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Weekly trade limit</span><strong>Unlimited</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Trading hours</span><strong>9:30am–4pm EST</strong></div>
+        </div>
+        <button id="autoStartBtn" class="gold" style="width:100%;margin-bottom:8px">▶ Start Auto Engine</button>
+        <p style="color:#ff4f4f;font-size:11px;text-align:center;margin:0">⚠️ Paper trading only. Real money execution is disabled.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">MY WATCHLIST</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input type="text" id="watchlistInput" placeholder="Add symbol e.g. AAPL" style="margin:0;flex:1"/>
+          <button class="gold" onclick="addToWatchlist()" style="padding:12px 16px;white-space:nowrap">Add</button>
+        </div>
+        <div id="watchlistTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px"></div>
+        <p style="color:var(--muted);font-size:12px">The engine also scans top market movers automatically.</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📡 LIVE SCAN FEED</div>
+      <div id="autoFeed" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto">
+        <div class="logitem">Auto engine not started yet.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🚀 AUTO TRADE LOG</div>
+      <div id="autoTradeLog"><div class="logitem">No auto trades yet.</div></div>
+    </div>
+  </section>
 
-RULES = {
-    'maxDailyLoss': 30, 'maxTrades': 999, 'maxPositionSize': 200,
-    'maxLossPerTrade': 9, 'takeProfitTarget': 30,
-    'minConfidence': 30, 'maxVolatility': 90, 'minSyncScore': 30, 'maxSharesPerStock': 5, 'takeProfitPct': 15,
+  <section id="replay" class="view">
+    <h2>Replay Lab</h2>
+    <div class="panel">
+      <label>Replay Note</label>
+      <input id="replayNote" placeholder="Example: waited for confirmation before route">
+      <label>Replay Result</label>
+      <select id="replayResult">
+        <option>Approved Lesson</option><option>Route Blocked</option>
+        <option>Late Entry Avoided</option><option>Volatility Defense Triggered</option><option>Needs Review</option>
+      </select>
+      <button class="gold" id="saveReplay">Save Replay</button>
+      <button class="dark" id="clearReplay">Clear Log</button>
+    </div>
+    <div class="panel"><h3>Replay Log</h3><div id="replayLog"></div></div>
+  </section>
+
+  <section id="mistakes" class="view">
+    <h2>Mistake Tags</h2>
+    <div class="cardgrid">
+      <div class="card"><span>Late Entry</span><strong>Watch</strong><p>Avoid entries after extension.</p></div>
+      <div class="card"><span>Chase Trade</span><strong>Blocked</strong><p>Route rejected when confidence decays.</p></div>
+      <div class="card"><span>Overexposure</span><strong>Limit</strong><p>Avoid stacking correlated setups.</p></div>
+      <div class="card"><span>Fatigue</span><strong>Monitor</strong><p>Switch to replay mode when execution quality falls.</p></div>
+    </div>
+  </section>
+
+  <section id="confidence" class="view">
+    <h2>Confidence Decay</h2>
+    <div class="panel">
+      <label>Entry Window Quality &nbsp;<strong id="confidenceValue" style="color:var(--gold)">82</strong></label>
+      <input type="range" min="0" max="100" value="82" id="confidenceRange">
+      <button class="gold" id="runConfidence">Run Decay Check</button>
+      <div id="confidenceOutput" class="notes"></div>
+    </div>
+  </section>
+
+  <section id="journal" class="view">
+    <h2>Trade Journal</h2>
+    <div class="panel">
+      <label>Ticker</label>
+      <input id="journalTicker" placeholder="Example: NVDA">
+      <label>Setup</label>
+      <select id="journalSetup">
+        <option>A/A+ Breakout</option><option>Pullback Reclaim</option>
+        <option>Liquidity Sweep Reclaim</option><option>Replay Only</option>
+      </select>
+      <label>Note</label>
+      <input id="journalNote" placeholder="What happened?">
+      <button class="gold" id="saveJournal">Save Journal</button>
+    </div>
+    <div class="panel"><h3>Journal Log</h3><div id="journalLog"></div></div>
+  </section>
+
+  <section id="route" class="view">
+    <h2>X24 Autonomous Route Intelligence</h2>
+    <div class="panel">
+      <label>Route Type</label>
+      <select id="routeType">
+        <option>Momentum Continuation</option><option>Liquidity Sweep Reclaim</option>
+        <option>Breakout Confirmation</option><option>Pullback Reclaim</option><option>Replay Only</option>
+      </select>
+      <label>Route Confidence &nbsp;<strong id="routeConfidenceValue" style="color:var(--gold)">82</strong></label>
+      <input type="range" min="0" max="100" value="82" id="routeConfidence">
+      <button class="gold" id="runRoute">Run Route Intelligence</button>
+      <div id="routeOutput" class="notes"></div>
+    </div>
+  </section>
+
+  <section id="volatility" class="view">
+    <h2>X25 Volatility Containment</h2>
+    <div class="panel">
+      <label>Volatility Pressure &nbsp;<strong id="volPressureValue" style="color:var(--gold)">61</strong></label>
+      <input type="range" min="0" max="100" value="61" id="volPressure">
+      <label>Containment Mode</label>
+      <select id="containMode">
+        <option>Normal Containment</option><option>Elevated Pressure</option>
+        <option>Defense Mode</option><option>Replay Enforcement</option>
+      </select>
+      <button class="gold" id="runContain">Analyze Volatility</button>
+      <div id="containOutput" class="notes"></div>
+    </div>
+  </section>
+
+  <section id="sync" class="view">
+    <h2>X26 Institutional Synchronization</h2>
+    <div class="cardgrid">
+      <div class="card"><span>Timing Sync</span><strong id="timingSync">84</strong><input id="timingSyncInput" type="range" min="0" max="100" value="84"></div>
+      <div class="card"><span>Risk Sync</span><strong id="riskSync">78</strong><input id="riskSyncInput" type="range" min="0" max="100" value="78"></div>
+      <div class="card"><span>Replay Sync</span><strong id="replaySync">88</strong><input id="replaySyncInput" type="range" min="0" max="100" value="88"></div>
+      <div class="card"><span>Route Sync</span><strong id="routeSync">81</strong><input id="routeSyncInput" type="range" min="0" max="100" value="81"></div>
+    </div>
+    <div class="panel">
+      <button class="gold" id="runSync">Run Synchronization</button>
+      <div id="syncOutput" class="notes"></div>
+    </div>
+  </section>
+
+  <section id="gate" class="view">
+    <h2>X26 Paper Execution Gate</h2>
+    <div class="panel">
+      <label>Execution Request</label>
+      <select id="executionRequest">
+        <option>Approve Paper Watch</option><option>Send to Paper Queue</option>
+        <option>Replay Before Route</option><option>Block Route</option>
+      </select>
+      <label>System Safety</label>
+      <select id="systemSafety">
+        <option>Normal</option><option>Elevated Risk</option>
+        <option>Volatility Defense</option><option>Replay Only</option>
+      </select>
+      <button class="gold" id="runGate">Run Execution Gate</button>
+      <div id="gateOutput" class="notes"></div>
+    </div>
+  </section>
+
+  <section id="log" class="view">
+    <h2>Trade Log</h2>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="panel-title" style="margin:0">All Paper Trades</div>
+        <button class="refresh" id="refreshLog">Refresh</button>
+      </div>
+      <div id="tradeLogTable"><p style="color:var(--muted);font-size:13px">Loading...</p></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Weekly Summary</div>
+      <div id="weeklySummary"><p style="color:var(--muted);font-size:13px">Loading...</p></div>
+    </div>
+  </section>
+
+  <section id="congress" class="view">
+    <h2>🏛️ Congressional Copy Engine</h2>
+    <div class="grid2">
+      <div class="panel">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <div id="congressDot" style="width:10px;height:10px;border-radius:50%;background:#a8b0bd;flex-shrink:0"></div>
+          <strong id="congressStatus" style="font-size:13px;color:var(--muted)">CONGRESS ENGINE STOPPED</strong>
+        </div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.6">Monitors congressional stock trades from Capitol Trades and automatically copies BUY trades on your paper account. Runs once per day during market hours.</p>
+        <div style="background:#070a0f;border:1px solid #202838;border-radius:12px;padding:14px;margin-bottom:16px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Data source</span><strong>Capitol Trades</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Scan frequency</span><strong>Every hour</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--muted)">Max copies/day</span><strong>3 trades</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Copied today</span><strong id="congressCopiedToday">0</strong></div>
+        </div>
+        <button id="congressStartBtn" class="gold" style="width:100%;margin-bottom:8px">▶ Start Congress Engine</button>
+        <button id="congressScanBtn" class="dark" style="width:100%;margin-bottom:8px">🔍 Force Scan Now</button>
+        <p style="color:#ff4f4f;font-size:11px;text-align:center;margin:0">⚠️ Paper trading only. Copies congressional BUY trades only.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📋 HOW IT WORKS</div>
+        <div class="notes">
+          <div class="note good">✅ Fetches latest trades from Capitol Trades daily</div>
+          <div class="note good">✅ Copies congressional BUY orders to your paper account</div>
+          <div class="note warn">⚠️ Congressional trades are disclosed up to 45 days late</div>
+          <div class="note warn">⚠️ Past performance doesn't guarantee future results</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📡 CONGRESS SCAN FEED</div>
+      <div id="congressFeed" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto">
+        <div class="logitem">Congress engine not started yet.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🏛️ COPIED TRADES LOG</div>
+      <div id="congressTradeLog"><div class="logitem">No congressional trades copied yet.</div></div>
+    </div>
+  </section>
+
+  <section id="benchmark" class="view">
+    <h2>📊 Real vs Paper Benchmark</h2>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">🤖 PAPER TRADING (Precision Alpha AI)</div>
+        <div style="font-size:28px;font-weight:700;color:#67ff74;margin:10px 0" id="bmPaperBalance">--</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Paper Account Value</div>
+        <div style="font-size:18px;font-weight:600" id="bmPaperPL">--</div>
+        <div style="font-size:12px;color:var(--muted)">Total P&L from $100,000</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">💼 REAL PORTFOLIO</div>
+        <div style="font-size:28px;font-weight:700;color:#f2bf4b;margin:10px 0" id="bmRealBalance">--</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Real Account Value</div>
+        <div style="font-size:18px;font-weight:600" id="bmRealPL">--</div>
+        <div style="font-size:12px;color:var(--muted)">Total P&L</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📈 PERFORMANCE COMPARISON</div>
+      <div style="display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#070a0f;border:1px solid #202838;border-radius:10px;padding:14px;text-align:center">
+          <div style="color:var(--muted);font-size:12px;margin-bottom:6px">Paper Return</div>
+          <div style="font-size:22px;font-weight:700;color:#67ff74" id="bmPaperReturn">--</div>
+        </div>
+        <div style="flex:1;min-width:140px;background:#070a0f;border:1px solid #202838;border-radius:10px;padding:14px;text-align:center">
+          <div style="color:var(--muted);font-size:12px;margin-bottom:6px">Real Return</div>
+          <div style="font-size:22px;font-weight:700;color:#f2bf4b" id="bmRealReturn">--</div>
+        </div>
+        <div style="flex:1;min-width:140px;background:#070a0f;border:1px solid #202838;border-radius:10px;padding:14px;text-align:center">
+          <div style="color:var(--muted);font-size:12px;margin-bottom:6px">Winner</div>
+          <div style="font-size:22px;font-weight:700" id="bmWinner">--</div>
+        </div>
+      </div>
+      <div class="notes" style="margin-top:10px">
+        <div class="note good">✅ Paper trading started at $100,000</div>
+        <div class="note warn">⚠️ Real portfolio comparison is manually entered</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📝 UPDATE REAL PORTFOLIO VALUE</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input id="bmRealInput" type="number" step="0.01" min="0" placeholder="e.g. 548.43" 
+          style="flex:1;min-width:200px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:12px 14px;color:#ffffff;font-size:16px;outline:none;-webkit-appearance:none;"/>
+        <button class="gold" onclick="updateRealPortfolio()" style="white-space:nowrap">Update Value</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">Enter your total real brokerage account value to compare performance</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📅 BENCHMARK HISTORY</div>
+      <div id="bmHistory" style="max-height:300px;overflow-y:auto">
+        <div class="logitem">No history yet — update your real portfolio value to start tracking.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="settings" class="view">
+    <h2>⚙️ Trading Settings</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Changes apply instantly — no code editing needed!</p>
+    <div class="panel">
+      <div class="panel-title">🛡️ RISK MANAGEMENT</div>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Stop Loss Per Share ($)</div>
+            <div style="font-size:12px;color:var(--muted)">Sell when any share loses this amount</div>
+          </div>
+          <input id="set_maxLossPerTrade" type="number" step="0.5" min="1" max="50"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Take Profit (%)</div>
+            <div style="font-size:12px;color:var(--muted)">Sell when position gains this percentage</div>
+          </div>
+          <input id="set_takeProfitPct" type="number" step="1" min="1" max="100"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Daily Loss Limit ($)</div>
+            <div style="font-size:12px;color:var(--muted)">Stop all buying after this total daily loss</div>
+          </div>
+          <input id="set_maxDailyLoss" type="number" step="5" min="10" max="500"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Max Shares Per Stock</div>
+            <div style="font-size:12px;color:var(--muted)">Maximum shares to hold in any single stock</div>
+          </div>
+          <input id="set_maxSharesPerStock" type="number" step="1" min="1" max="50"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Max Position Size ($)</div>
+            <div style="font-size:12px;color:var(--muted)">Max dollar amount per trade</div>
+          </div>
+          <input id="set_maxPositionSize" type="number" step="10" min="50" max="2000"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🤖 AI THRESHOLDS</div>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Min Confidence Score</div>
+            <div style="font-size:12px;color:var(--muted)">Minimum AI confidence to place trade (0-100)</div>
+          </div>
+          <input id="set_minConfidence" type="number" step="5" min="0" max="100"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Max Volatility</div>
+            <div style="font-size:12px;color:var(--muted)">Skip stocks above this volatility (0-100)</div>
+          </div>
+          <input id="set_maxVolatility" type="number" step="5" min="0" max="100"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">Min Sync Score</div>
+            <div style="font-size:12px;color:var(--muted)">Minimum synchronization score (0-100)</div>
+          </div>
+          <input id="set_minSyncScore" type="number" step="5" min="0" max="100"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+      </div>
+    </div>
+    <button class="gold" style="width:100%;margin-top:10px;font-size:16px;padding:14px" onclick="saveSettings()">💾 Save All Settings</button>
+    <div id="settingsStatus" style="text-align:center;margin-top:10px;font-size:13px;color:var(--muted)"></div>
+  </section>
+
+  <section id="manualtrade" class="view">
+    <h2>📈 Manual Trade</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Place buy or sell orders directly without going to Alpaca!</p>
+    <div class="panel">
+      <div class="panel-title">🔍 STOCK LOOKUP</div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <input id="mt_symbol" type="text" placeholder="Enter ticker e.g. AAPL"
+          style="flex:1;min-width:150px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:12px 14px;color:#fff;font-size:16px;text-transform:uppercase"/>
+        <button class="dark" onclick="lookupStock()" style="white-space:nowrap">🔍 Look Up</button>
+      </div>
+      <div id="mt_quote" style="background:#070a0f;border:1px solid #202838;border-radius:10px;padding:14px;margin-bottom:16px;display:none">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="color:var(--muted)">Symbol</span><strong id="mt_q_symbol">--</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="color:var(--muted)">Current Price</span><strong id="mt_q_price" style="color:#67ff74">--</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--muted)">Est. Cost (1 share)</span><strong id="mt_q_cost">--</strong>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📋 PLACE ORDER</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px;font-weight:600">Quantity</span>
+          <input id="mt_qty" type="number" step="1" min="1" value="1"
+            style="width:100px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:8px 12px;color:#fff;font-size:16px;text-align:center"/>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="gold" style="flex:1;padding:14px;font-size:16px" onclick="placeManualTrade('buy')">🟢 BUY</button>
+          <button style="flex:1;padding:14px;font-size:16px;background:rgba(255,79,79,.2);color:#ff4f4f;border:1px solid rgba(255,79,79,.4);border-radius:10px;cursor:pointer;font-weight:700" onclick="placeManualTrade('sell')">🔴 SELL</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📋 OPEN POSITIONS (Quick Sell)</div>
+      <div id="mt_positions">Loading positions...</div>
+    </div>
+  </section>
+
+  <section id="winrate" class="view">
+    <h2>📊 Win Rate Tracker</h2>
+    <div class="grid2">
+      <div class="panel" style="text-align:center">
+        <div style="font-size:48px;font-weight:800;color:#67ff74" id="wr_winrate">--</div>
+        <div style="font-size:14px;color:var(--muted);margin-top:4px">Win Rate</div>
+      </div>
+      <div class="panel" style="text-align:center">
+        <div style="font-size:48px;font-weight:800;color:#f2bf4b" id="wr_rr">--</div>
+        <div style="font-size:14px;color:var(--muted);margin-top:4px">Reward:Risk Ratio</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title">📈 TRADE STATS</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Total Trades</span><strong id="wr_total">--</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Wins</span><strong id="wr_wins" style="color:#67ff74">--</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Losses</span><strong id="wr_losses" style="color:#ff4f4f">--</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Avg Win</span><strong id="wr_avggain" style="color:#67ff74">--</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Avg Loss</span><strong id="wr_avgloss" style="color:#ff4f4f">--</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Total P&L</span><strong id="wr_totalpl">--</strong></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🎯 PERFORMANCE RATING</div>
+        <div id="wr_rating" style="text-align:center;padding:20px">
+          <div style="font-size:40px;margin-bottom:10px">--</div>
+          <div style="font-size:14px;color:var(--muted)" id="wr_rating_text">Loading...</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📋 RECENT CLOSED TRADES</div>
+      <div id="wr_trades" style="max-height:400px;overflow-y:auto">
+        <div class="logitem">Loading trade history...</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="news" class="view">
+    <h2>📰 Live Market News</h2>
+    <div class="panel">
+      <div class="panel-title">🔍 STOCK NEWS LOOKUP</div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <input id="news_symbol" type="text" placeholder="Enter ticker e.g. AAPL"
+          style="flex:1;min-width:150px;background:#0d1117;border:1px solid #404858;border-radius:8px;padding:12px 14px;color:#fff;font-size:16px;text-transform:uppercase"/>
+        <button class="gold" onclick="loadStockNews()" style="white-space:nowrap">🔍 Get News</button>
+      </div>
+      <div id="stock_news"><div class="logitem">Enter a ticker to see latest news</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🌍 MARKET NEWS FEED</div>
+      <button class="dark" onclick="loadMarketNews()" style="margin-bottom:14px;width:100%">🔄 Refresh Market News</button>
+      <div id="market_news"><div class="logitem">Loading market news...</div></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script>
+const BASE_URL='https://precision-alpha-backend-hs6g.onrender.com/api';
+const DATA_URL='https://precision-alpha-backend-hs6g.onrender.com/api';
+const EMAILJS_PUBLIC='i9a72iQL0ChaDHoZL';
+const EMAILJS_SERVICE='service_rucosmz';
+const EMAILJS_TEMPLATE='template_qajvk5t';
+const ALERT_EMAIL='pinnacleperformancetax@gmail.com';
+const DEFAULT_WATCHLIST=['AAPL','TSLA','NVDA','SPY','QQQ','MSFT','AMD','META'];
+const MARKET_SCAN_LIST=['AAPL','TSLA','NVDA','SPY','QQQ','MSFT','AMD','META','GOOGL','AMZN','NFLX','SOFI','PLTR','RIVN','COIN'];
+
+const RULES={maxDailyLoss:30,maxTrades:9999,maxPositionSize:200,maxLossPerTrade:15,takeProfitTarget:30,minConfidence:30,maxVolatility:90,minSyncScore:30,tradeStartHour:9,tradeStartMinute:30,tradeEndHour:16,tradeEndMinute:0};
+
+let state={killed:false,autoRunning:false,autoInterval:null,weeklyTrades:JSON.parse(localStorage.getItem('pa_weekly_trades')||'[]'),todayPL:parseFloat(localStorage.getItem('pa_today_pl')||'0'),watchlist:JSON.parse(localStorage.getItem('pa_watchlist')||JSON.stringify(DEFAULT_WATCHLIST)),autoLog:JSON.parse(localStorage.getItem('pa_auto_log')||'[]')};
+
+const today=new Date().toDateString();
+if(localStorage.getItem('pa_last_date')!==today){state.todayPL=0;localStorage.setItem('pa_today_pl','0');localStorage.setItem('pa_last_date',today);}
+function getWeekKey(){const d=new Date(),day=d.getDay(),diff=d.getDate()-day+(day===0?-6:1);return new Date(d.setDate(diff)).toDateString();}
+if(localStorage.getItem('pa_week_key')!==getWeekKey()){state.weeklyTrades=[];localStorage.setItem('pa_weekly_trades','[]');localStorage.setItem('pa_week_key',getWeekKey());}
+
+const qs=s=>document.querySelector(s);
+const qsa=s=>Array.from(document.querySelectorAll(s));
+function fmtMoney(v){const n=parseFloat(v)||0;return(n<0?'-$':'$')+Math.abs(n).toFixed(2);}
+function toast(msg,type='success'){const el=qs('#toast');el.textContent=msg;el.className=`toast show ${type}`;setTimeout(()=>el.classList.remove('show'),3500);}
+function notes(id,items){const el=qs('#'+id);if(!el)return;el.innerHTML=items.map(([t,c=''])=>`<div class="note ${c}">${t}</div>`).join('');}
+function showView(id){qsa('.view').forEach(v=>v.classList.remove('active'));qsa('.nav').forEach(b=>b.classList.remove('active'));qs('#'+id)?.classList.add('active');qsa('.nav').find(b=>b.dataset.view===id)?.classList.add('active');}
+function isMarketHours(){const now=new Date(),est=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'})),h=est.getHours(),m=est.getMinutes();return(h>RULES.tradeStartHour||(h===RULES.tradeStartHour&&m>=RULES.tradeStartMinute))&&(h<RULES.tradeEndHour);}
+function setRule(id,cls,val){const el=qs('#'+id);if(!el)return;el.className=`rule ${cls}`;const v=qs('#'+id+'-val');if(v)v.textContent=val;}
+function getStore(k){return JSON.parse(localStorage.getItem(k)||'[]');}
+function setStore(k,v){localStorage.setItem(k,JSON.stringify(v.slice(0,30)));}
+
+async function alpaca(path,method='GET',body=null){const url='https://precision-alpha-backend-hs6g.onrender.com/api'+path;const opts={method,headers:{'Content-Type':'application/json'}};if(body)opts.body=JSON.stringify(body);const res=await fetch(url,opts);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.message||`HTTP ${res.status}`);}return res.json();}
+async function getLatestTrade(symbol){const res=await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/quote/'+symbol);if(!res.ok)throw new Error('Symbol not found');return res.json();}
+async function getBars(symbol){const end=new Date().toISOString(),start=new Date(Date.now()-2*24*60*60*1000).toISOString();const res=await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/bars/'+symbol+'?start='+start+'&end='+end);if(!res.ok)return null;return res.json();}
+
+async function sendTradeEmail(symbol,side,qty,price,reason,verdict){try{await emailjs.send(EMAILJS_SERVICE,EMAILJS_TEMPLATE,{to_email:ALERT_EMAIL,subject:`🤖 Precision Alpha: ${verdict} — ${side.toUpperCase()} ${qty} ${symbol}`,trade_symbol:symbol,trade_side:side.toUpperCase(),trade_qty:qty,trade_price:fmtMoney(price),trade_total:fmtMoney(price*qty),trade_reason:reason,trade_verdict:verdict,trade_time:new Date().toLocaleString('en-US',{timeZone:'America/New_York'})+' EST',stop_loss:fmtMoney(price-(RULES.maxLossPerTrade/qty)),take_profit:fmtMoney(price+(RULES.takeProfitTarget/qty))});}catch(e){console.error('Email failed:',e);}}
+
+async function analyzeTradeWithAI(symbol,side,qty,price,confidence,volatility,syncScore,style){const prompt=`You are Precision Alpha AI, an expert trading analyst. Analyze this paper trade.\nTRADE: ${side.toUpperCase()} ${qty} shares of ${symbol} at $${price.toFixed(2)}\nSTYLE: ${style}\nSIGNALS: X24 Confidence ${confidence}/100 · X25 Volatility ${volatility}/100 · X26 Sync ${syncScore}/100\nRULES: Max loss $${RULES.maxLossPerTrade}/trade · Target profit $${RULES.takeProfitTarget}/trade\n\nProvide:\n1. VERDICT: "✅ GOOD TRADE" or "⚠️ RISKY TRADE" or "❌ BAD TRADE"\n2. SCORE: 0-100\n3. REASON: 2-3 simple sentences\n4. STOP LOSS: specific exit price\n5. TAKE PROFIT: specific exit price\n6. TIP: one actionable tip\n\nSimple language. No jargon.`;const response=await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,max_tokens:500})});const data=await response.json();return data.content[0].text;}
+
+async function quickAICheck(symbol,price,priceChange){const prompt=`Precision Alpha AI auto-scanner. Evaluate for paper trade.\nStock: ${symbol} | Price: $${price.toFixed(2)} | 1-day change: $${priceChange.toFixed(2)}\nRespond ONLY with JSON (no markdown): {"confidence":0-100,"volatility":0-100,"sync":0-100,"side":"buy" or "sell","reason":"one sentence"}\nBe very aggressive. Almost all stocks should pass. confidence>30, volatility<90, sync>30 required.`;const response=await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,max_tokens:150})});const data=await response.json();return JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());}
+
+function checkSafetyGate(confidence,volatility,syncScore){const issues=[],warns=[];if(state.killed)issues.push('⛔ Kill switch is active');if(state.todayPL<=-RULES.maxDailyLoss)issues.push(`Daily loss limit hit`);if(state.weeklyTrades.length>=RULES.maxTrades)issues.push(`Weekly trade limit (${state.weeklyTrades.length}/${RULES.maxTrades})`);if(!isMarketHours())issues.push('Outside trading hours (10am–3:30pm EST)');if(confidence<RULES.minConfidence)issues.push(`Confidence too low (${confidence}<${RULES.minConfidence})`);if(volatility>RULES.maxVolatility)issues.push(`Volatility too high (${volatility}>${RULES.maxVolatility})`);if(syncScore<RULES.minSyncScore)issues.push(`Sync too low (${syncScore}<${RULES.minSyncScore})`);if(confidence<80&&confidence>=RULES.minConfidence)warns.push(`Confidence borderline`);if(volatility>60&&volatility<=RULES.maxVolatility)warns.push(`Volatility elevated`);return{ok:issues.length===0,issues,warns};}
+
+async function autoScanAndTrade(){if(!isMarketHours()){logAutoEvent('⏰ Outside trading hours — scan skipped');return;}if(state.killed){logAutoEvent('⛔ Kill switch active');return;}if(state.todayPL<=-RULES.maxDailyLoss){logAutoEvent('🔴 Daily loss limit hit');return;}if(state.weeklyTrades.length>=RULES.maxTrades){logAutoEvent(`🔴 Weekly limit reached`);return;}const allSymbols=[...new Set([...state.watchlist,...MARKET_SCAN_LIST])];logAutoEvent(`🔍 Scanning ${allSymbols.length} stocks...`);for(const symbol of allSymbols){if(state.weeklyTrades.length>=RULES.maxTrades)break;try{const tradeData=await getLatestTrade(symbol);const price=tradeData.trade?.p||tradeData.trade?.price||0;const barData=await getBars(symbol);const bars=barData?.bars||[];const priceChange=bars.length>=2?(bars[bars.length-1].c-bars[bars.length-2].c):0;if(price<5||price>500)continue;let aiCheck;try{aiCheck=await quickAICheck(symbol,price,priceChange);}catch(e){continue;}const gate=checkSafetyGate(aiCheck.confidence,aiCheck.volatility,aiCheck.sync);if(!gate.ok){logAutoEvent(`⚫ ${symbol} — blocked`);continue;}const qty=Math.floor(RULES.maxPositionSize/price)||1;logAutoEvent(`✅ ${symbol} — ${aiCheck.side.toUpperCase()} signal. Placing...`);try{const order=await alpaca('/orders','POST',{symbol,qty:qty.toString(),side:aiCheck.side,type:'market',time_in_force:'day'});state.weeklyTrades.push({symbol,side:aiCheck.side,qty,price,time:new Date().toISOString(),auto:true,orderId:order.id});localStorage.setItem('pa_weekly_trades',JSON.stringify(state.weeklyTrades));const logEntry=`${new Date().toLocaleTimeString()} · AUTO: ${aiCheck.side.toUpperCase()} ${qty} ${symbol} @ ${fmtMoney(price)} · ${aiCheck.reason}`;state.autoLog.unshift(logEntry);state.autoLog=state.autoLog.slice(0,50);localStorage.setItem('pa_auto_log',JSON.stringify(state.autoLog));logAutoEvent(`🚀 ORDER: ${aiCheck.side.toUpperCase()} ${qty} ${symbol} @ ${fmtMoney(price)}`);toast(`🤖 Auto: ${aiCheck.side.toUpperCase()} ${qty} ${symbol}`,'success');await sendTradeEmail(symbol,aiCheck.side,qty,price,aiCheck.reason,'AUTO TRADE');renderAutoLog();break;}catch(e){logAutoEvent(`❌ ${symbol} — failed: ${e.message}`);}}catch(e){continue;}await new Promise(r=>setTimeout(r,500));}logAutoEvent('✓ Scan complete — next in 5 min');}
+
+function logAutoEvent(msg){const el=qs('#autoFeed');if(!el)return;const div=document.createElement('div');div.className='logitem';div.textContent=`${new Date().toLocaleTimeString()} — ${msg}`;el.insertBefore(div,el.firstChild);while(el.children.length>30)el.removeChild(el.lastChild);}
+async function startAutoEngine(){
+  try{
+    const res=await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/engine/start',{method:'POST'});
+    const data=await res.json();
+    if(data.status==='running'){
+      state.autoRunning=true;
+      const btn=qs('#autoStartBtn');
+      if(btn){btn.textContent='⏹ Stop Auto Engine';btn.style.background='rgba(255,79,79,.2)';btn.style.color='#ff4f4f';btn.style.border='1px solid rgba(255,79,79,.4)';}
+      const dot=qs('#autoDot');if(dot){dot.style.background='#67ff74';dot.style.boxShadow='0 0 8px #67ff74';}
+      const status=qs('#autoStatus');if(status)status.textContent='AUTO ENGINE RUNNING ON SERVER — scanning every 5 minutes';
+      toast('🤖 Auto engine started on server — runs 24/7!','success');
+      startPollingStatus();
+    }
+  }catch(e){toast('Failed to start engine: '+e.message,'error');}
+}
+async function stopAutoEngine(){
+  try{
+    await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/engine/stop',{method:'POST'});
+    state.autoRunning=false;
+    const btn=qs('#autoStartBtn');
+    if(btn){btn.textContent='▶ Start Auto Engine';btn.style.background='linear-gradient(180deg,#f2bf4b,#c88d1f)';btn.style.color='#111';btn.style.border='none';}
+    const dot=qs('#autoDot');if(dot){dot.style.background='#a8b0bd';dot.style.boxShadow='none';}
+    const status=qs('#autoStatus');if(status)status.textContent='AUTO ENGINE STOPPED';
+    toast('Auto engine stopped','warn');
+  }catch(e){toast('Failed to stop engine','error');}
+}
+function renderAutoLog(){const el=qs('#autoTradeLog');if(!el)return;el.innerHTML=state.autoLog.length?state.autoLog.map(x=>`<div class="logitem">${x}</div>`).join(''):'<div class="logitem">No auto trades yet.</div>';}
+function renderWatchlist(){const el=qs('#watchlistTags');if(!el)return;el.innerHTML=state.watchlist.map(s=>`<span class="wtag">${s}<button onclick="removeFromWatchlist('${s}')" style="background:none;border:none;color:#ff4f4f;cursor:pointer;margin-left:4px;font-weight:900">×</button></span>`).join('');}
+function addToWatchlist(){const input=qs('#watchlistInput');const sym=(input?.value||'').trim().toUpperCase();if(!sym){toast('Enter a symbol','warn');return;}if(state.watchlist.includes(sym)){toast(`${sym} already in watchlist`,'warn');return;}if(state.watchlist.length>=20){toast('Max 20 symbols','warn');return;}state.watchlist.push(sym);localStorage.setItem('pa_watchlist',JSON.stringify(state.watchlist));input.value='';renderWatchlist();toast(`${sym} added`,'success');}
+function removeFromWatchlist(sym){state.watchlist=state.watchlist.filter(s=>s!==sym);localStorage.setItem('pa_watchlist',JSON.stringify(state.watchlist));renderWatchlist();}
+
+async function loadDashboard(){try{const acct=await alpaca('/account');const equity=parseFloat(acct.equity);const pl=equity-parseFloat(acct.last_equity);state.todayPL=pl;localStorage.setItem('pa_today_pl',pl.toString());qs('#dashBal').textContent=fmtMoney(equity);qs('#topBal').textContent=fmtMoney(equity);const plEl=qs('#dashPL');plEl.textContent=fmtMoney(pl);plEl.style.color=pl>=0?'var(--green)':'var(--red)';const topPL=qs('#topPL');topPL.textContent=fmtMoney(pl);topPL.className=pl>=0?'':'loss';qs('#dashTrades').textContent=`${state.weeklyTrades.length} / ${RULES.maxTrades}`;updateRules();await loadPositions();await loadRecentOrders();}catch(e){qs('#topBal').textContent='Error';console.error(e);}}
+function updateRules(){const inHours=isMarketHours();setRule('rule-daily',state.todayPL>-RULES.maxDailyLoss?'ok':'bad',state.todayPL>-RULES.maxDailyLoss?'OK':'STOP');setRule('rule-trades',state.weeklyTrades.length<RULES.maxTrades?'ok':'bad',`${state.weeklyTrades.length}/${RULES.maxTrades}`);setRule('rule-time',inHours?'ok':'warn',inHours?'OPEN':'CLOSED');}
+async function loadPositions(){try{const pos=await alpaca('/positions');if(!pos.length){qs('#positionsList').innerHTML='<p style="color:var(--muted);font-size:13px">No open positions.</p>';return;}qs('#positionsList').innerHTML=`<table class="tbl"><thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>P&L</th></tr></thead><tbody>${pos.map(p=>{const pl=parseFloat(p.unrealized_pl);return`<tr><td><strong>${p.symbol}</strong></td><td>${p.qty}</td><td>${fmtMoney(p.avg_entry_price)}</td><td style="color:${pl>=0?'var(--green)':'var(--red)'}">${fmtMoney(pl)}</td></tr>`;}).join('')}</tbody></table>`;}catch(e){qs('#positionsList').innerHTML='<p style="color:var(--muted);font-size:13px">Could not load.</p>';}}
+async function loadRecentOrders(){try{const orders=await alpaca('/orders?status=all&limit=8');if(!orders.length){qs('#recentOrders').innerHTML='<p style="color:var(--muted);font-size:13px">No orders yet.</p>';return;}qs('#recentOrders').innerHTML=`<table class="tbl"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th><th>Time</th></tr></thead><tbody>${orders.map(o=>`<tr><td><strong>${o.symbol}</strong></td><td><span class="badge-pill ${o.side}">${o.side.toUpperCase()}</span></td><td>${o.qty}</td><td><span class="badge-pill ${o.status==='filled'?'filled':'pending'}">${o.status}</span></td><td style="color:var(--muted);font-size:11px">${new Date(o.submitted_at).toLocaleDateString()}</td></tr>`).join('')}</tbody></table>`;}catch(e){qs('#recentOrders').innerHTML='<p style="color:var(--muted);font-size:13px">Could not load.</p>';}}
+
+async function checkGate(){const symbol=qs('#tradeSymbol').value.trim().toUpperCase();const confidence=parseInt(qs('#tradeConfidence').value);const volatility=parseInt(qs('#tradeVolatility').value);const syncScore=parseInt(qs('#tradeSyncScore').value);const qty=parseInt(qs('#tradeQty').value);const side=qs('#tradeAction').value;const style=qs('#tradeStyle').value;const resultEl=qs('#tradeGateResult');const submitBtn=qs('#submitTradeBtn');const aiBox=qs('#aiAnalysisBox');if(!symbol){toast('Enter a stock symbol first','warn');return;}let price=0;try{const trade=await getLatestTrade(symbol);price=trade.trade?.p||trade.trade?.price||0;const cost=price*qty;qs('#quoteBox').innerHTML=`<div class="quote-symbol">${symbol}</div><div class="quote-price">${fmtMoney(price)}</div><div class="quote-sub">${qty} share${qty>1?'s':''} = ${fmtMoney(cost)}</div>`;qs('#riskBox').innerHTML=`<div class="rule-list"><div class="rule ${cost<=RULES.maxPositionSize?'ok':'bad'}"><span class="rule-dot"></span><span>Position: ${fmtMoney(cost)}</span><span class="rule-val">${cost<=RULES.maxPositionSize?'OK':'OVER $200'}</span></div><div class="rule ok"><span class="rule-dot"></span><span>Stop loss: ${fmtMoney(price-(RULES.maxLossPerTrade/qty))}</span></div><div class="rule ok"><span class="rule-dot"></span><span>Take profit: ${fmtMoney(price+(RULES.takeProfitTarget/qty))}</span></div></div>`;}catch(e){qs('#quoteBox').innerHTML=`<p style="color:var(--muted);font-size:13px">Could not fetch quote for ${symbol}.</p>`;}const gate=checkSafetyGate(confidence,volatility,syncScore);resultEl.style.display='block';submitBtn.style.display='none';setRule('rule-conf',confidence>=RULES.minConfidence?'ok':'bad',confidence.toString());setRule('rule-vol',volatility<=RULES.maxVolatility?'ok':'bad',volatility.toString());setRule('rule-sync',syncScore>=RULES.minSyncScore?'ok':'bad',syncScore.toString());if(!gate.ok){resultEl.className='gate-result red';resultEl.innerHTML='🔴 TRADE BLOCKED<br><small>'+gate.issues.join('<br>')+'</small>';}else if(gate.warns.length){resultEl.className='gate-result yellow';resultEl.innerHTML='🟡 CAUTION<br><small>'+gate.warns.join('<br>')+'</small>';submitBtn.style.display='block';}else{resultEl.className='gate-result green';resultEl.innerHTML='🟢 ALL CLEAR — Trade approved';submitBtn.style.display='block';}if(aiBox){aiBox.style.display='block';aiBox.innerHTML='<div class="ai-loading">🤖 AI is analyzing this trade...</div>';try{const analysis=await analyzeTradeWithAI(symbol,side,qty,price,confidence,volatility,syncScore,style);let cls='warn';if(analysis.includes('GOOD TRADE'))cls='good';if(analysis.includes('BAD TRADE'))cls='bad';aiBox.innerHTML=`<div class="ai-box ${cls}"><div class="ai-header">🤖 AI Analysis · ${style}</div><div class="ai-body">${analysis.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}</div></div>`;}catch(e){aiBox.innerHTML='<div class="ai-box warn">AI unavailable.</div>';}}}
+
+async function submitTrade(){const symbol=qs('#tradeSymbol').value.trim().toUpperCase();const side=qs('#tradeAction').value;const qty=parseInt(qs('#tradeQty').value);const orderType=qs('#tradeOrderType').value;const limitPx=qs('#tradeLimitPrice').value;if(!symbol||!qty){toast('Fill in symbol and quantity','warn');return;}if(state.killed){toast('Kill switch active!','error');return;}const order={symbol,qty:qty.toString(),side,type:orderType,time_in_force:'day'};if(orderType==='limit'&&limitPx)order.limit_price=limitPx;try{qs('#submitTradeBtn').textContent='Placing...';const result=await alpaca('/orders','POST',order);toast(`✅ ${side.toUpperCase()} ${qty} ${symbol} placed`,'success');state.weeklyTrades.push({symbol,side,qty,time:new Date().toISOString(),orderId:result.id});localStorage.setItem('pa_weekly_trades',JSON.stringify(state.weeklyTrades));await sendTradeEmail(symbol,side,qty,0,'Manual trade','MANUAL');qs('#submitTradeBtn').textContent='⚡ Submit Paper Trade';qs('#tradeGateResult').style.display='none';qs('#submitTradeBtn').style.display='none';qs('#tradeSymbol').value='';setTimeout(loadDashboard,1500);}catch(e){toast('Order failed: '+e.message,'error');qs('#submitTradeBtn').textContent='⚡ Submit Paper Trade';}}
+
+async function loadTradeLog(){try{const orders=await alpaca('/orders?status=all&limit=50');if(!orders.length){qs('#tradeLogTable').innerHTML='<p style="color:var(--muted);font-size:13px">No trades yet.</p>';return;}qs('#tradeLogTable').innerHTML=`<table class="tbl"><thead><tr><th>Date</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th></tr></thead><tbody>${orders.map(o=>`<tr><td style="font-size:11px;color:var(--muted)">${new Date(o.submitted_at).toLocaleDateString()}</td><td><strong>${o.symbol}</strong></td><td><span class="badge-pill ${o.side}">${o.side.toUpperCase()}</span></td><td>${o.qty}</td><td><span class="badge-pill ${o.status==='filled'?'filled':'pending'}">${o.status}</span></td></tr>`).join('')}</tbody></table>`;const weekStart=new Date();weekStart.setDate(weekStart.getDate()-weekStart.getDay());const wk=orders.filter(o=>new Date(o.submitted_at)>=weekStart);qs('#weeklySummary').innerHTML=`<div class="sum-grid"><div class="sum-item"><span>This Week</span><strong class="neutral">${wk.length}/${RULES.maxTrades}</strong></div><div class="sum-item"><span>Today P&L</span><strong class="${state.todayPL>=0?'':'loss'}">${fmtMoney(state.todayPL)}</strong></div><div class="sum-item"><span>Limit Left</span><strong class="neutral">${fmtMoney(RULES.maxDailyLoss+state.todayPL)}</strong></div></div>`;}catch(e){qs('#tradeLogTable').innerHTML='<p style="color:var(--muted);font-size:13px">Could not load.</p>';}}
+
+function loadFeed(){const el=qs('#feed');if(!el)return;el.innerHTML=['X24 Autonomous Route Intelligence online.','X25 Volatility Containment Engine active.','X26 Institutional Synchronization Layer aligned.',`Safety rules active: $${RULES.maxDailyLoss} daily · ${RULES.maxTrades} trades/week · Alpaca connected.`,'🤖 Auto Engine ready — click Auto Engine in sidebar to start.','Real-money execution remains disabled.'].map(x=>`<div class="logitem">${x}</div>`).join('');}
+function runConfidence(){const v=Number(qs('#confidenceRange').value);qs('#confidenceValue').textContent=v;let msg='Entry window valid.',cls='';if(v<65){msg='Decayed. Watchlist only.';cls='bad';}else if(v>88){msg='Strong. Confirmation still required.';cls='good';}notes('confidenceOutput',[[`Score: ${v}`,cls],[msg,cls],['Live execution disabled.','']]);}
+function runRoute(){const type=qs('#routeType').value,c=Number(qs('#routeConfidence').value);qs('#routeConfidenceValue').textContent=c;let d='May proceed to paper approval.',cls='';if(type==='Replay Only'){d='Diverted to replay.';cls='warn';}else if(c<RULES.minConfidence){d=`Below minimum (${c}<${RULES.minConfidence}).`;cls='bad';}else{d=`OK (${c}). Approved.`;cls='good';}notes('routeOutput',[[`Type: ${type}`,''],[`Confidence: ${c}`,cls],[d,cls]]);}
+function runContain(){const p=Number(qs('#volPressure').value),mode=qs('#containMode').value;qs('#volPressureValue').textContent=p;let msg='Contained.',cls='good';if(p>RULES.maxVolatility){msg='Exceeds limit. No trades.';cls='bad';}else if(p>60){msg='Elevated. Reduce size.';cls='warn';}if(mode==='Defense Mode'||mode==='Replay Enforcement'){msg=mode+' active.';cls='bad';}notes('containOutput',[[`Pressure: ${p}`,cls],[`Mode: ${mode}`,''],[msg,cls]]);}
+function runSync(){const pairs=[['timingSync','timingSyncInput'],['riskSync','riskSyncInput'],['replaySync','replaySyncInput'],['routeSync','routeSyncInput']];let total=0;pairs.forEach(([o,i])=>{const v=Number(qs('#'+i).value);qs('#'+o).textContent=v;total+=v;});const score=Math.round(total/4),cls=score>=RULES.minSyncScore?'good':score>=65?'warn':'bad';notes('syncOutput',[[`Score: ${score}`,cls],[score>=RULES.minSyncScore?'Approved.':'Below minimum. Replay.',cls],['Live disabled.','']]);}
+function runGate(){const req=qs('#executionRequest').value,safety=qs('#systemSafety').value;let d='APPROVED FOR PAPER WATCH.',cls='good';if(req==='Send to Paper Queue'){d='SENT TO QUEUE.';cls='good';}if(req==='Replay Before Route'){d='DIVERTED TO REPLAY.';cls='warn';}if(req==='Block Route'){d='BLOCKED.';cls='bad';}if(safety==='Elevated Risk'){d='LIMITED.';cls='warn';}if(safety==='Volatility Defense'||safety==='Replay Only'){d='BLOCKED — '+safety+' active.';cls='bad';}notes('gateOutput',[[`Request: ${req}`,''],[`Safety: ${safety}`,''],[d,cls],['Real-money disabled.','']]);}
+function renderReplay(){const items=getStore('x26_replay'),el=qs('#replayLog');if(el)el.innerHTML=items.length?items.map(x=>`<div class="logitem">${x}</div>`).join(''):'<div class="logitem">No entries yet.</div>';}
+function renderJournal(){const items=getStore('x26_journal'),el=qs('#journalLog');if(el)el.innerHTML=items.length?items.map(x=>`<div class="logitem">${x}</div>`).join(''):'<div class="logitem">No entries yet.</div>';}
+function saveReplay(){const note=qs('#replayNote').value.trim(),result=qs('#replayResult').value;if(!note){toast('Type a note first','warn');return;}const items=getStore('x26_replay');items.unshift(`${result}: ${note} — ${new Date().toLocaleString()}`);setStore('x26_replay',items);qs('#replayNote').value='';renderReplay();toast('Saved','success');}
+function saveJournal(){const ticker=(qs('#journalTicker').value||'TICKER').toUpperCase(),setup=qs('#journalSetup').value,note=qs('#journalNote').value.trim();if(!note){toast('Type a note first','warn');return;}const items=getStore('x26_journal');items.unshift(`${ticker} · ${setup}: ${note} — ${new Date().toLocaleString()}`);setStore('x26_journal',items);qs('#journalTicker').value='';qs('#journalNote').value='';renderJournal();toast('Saved','success');}
+async function activateKill(){
+  if(state.killed){
+    if(confirm('Reactivate?')){
+      state.killed=false;
+      qs('#killBtn').textContent='⛔ KILL SWITCH';
+      qs('#killBtn').style.background='rgba(255,79,79,.1)';
+      qs('#statusDot').className='status-dot';
+      qs('#statusPhase').textContent='X24-X26 • PAPER SAFE';
+      toast('Reactivated','success');
+    }
+  }else{
+    if(confirm('Activate kill switch? Stops ALL trading on server AND browser.')){
+      state.killed=true;
+      await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/engine/kill',{method:'POST'}).catch(()=>{});
+      state.autoRunning=false;
+      qs('#killBtn').textContent='✅ KILLED — Click to Restart';
+      qs('#killBtn').style.background='rgba(255,79,79,.3)';
+      qs('#statusDot').className='status-dot red';
+      qs('#statusPhase').textContent='KILL SWITCH ACTIVE';
+      toast('⛔ Kill switch activated — server trading stopped','error');
+    }
+  }
 }
 
-engine_state = {
-    'running': False, 'weekly_trades': [], 'today_pl': 0.0,
-    'last_date': '', 'week_key': '', 'scan_log': [], 'trade_log': [],
+
+async function startCongressEngine() {
+  try {
+    const res = await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/congress/start', {method:'POST'});
+    const data = await res.json();
+    if(data.status==='running') {
+      const btn=qs('#congressStartBtn');
+      if(btn){btn.textContent='⏹ Stop Congress Engine';btn.style.background='rgba(255,79,79,.2)';btn.style.color='#ff4f4f';btn.style.border='1px solid rgba(255,79,79,.4)';}
+      const dot=qs('#congressDot');if(dot){dot.style.background='#67ff74';dot.style.boxShadow='0 0 8px #67ff74';}
+      const status=qs('#congressStatus');if(status)status.textContent='CONGRESS ENGINE RUNNING';
+      toast('🏛️ Congress engine started!','success');
+      loadCongressStatus();
+    }
+  } catch(e){toast('Failed to start congress engine','error');}
 }
 
-congress_state = {
-    'running': False, 'last_scan': '', 'trade_log': [], 'scan_log': [],
-    'copied_trades': [],
+async function stopCongressEngine() {
+  try {
+    await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/congress/stop', {method:'POST'});
+    const btn=qs('#congressStartBtn');
+    if(btn){btn.textContent='▶ Start Congress Engine';btn.style.background='linear-gradient(180deg,#f2bf4b,#c88d1f)';btn.style.color='#111';btn.style.border='none';}
+    const dot=qs('#congressDot');if(dot){dot.style.background='#a8b0bd';dot.style.boxShadow='none';}
+    const status=qs('#congressStatus');if(status)status.textContent='CONGRESS ENGINE STOPPED';
+    toast('Congress engine stopped','warn');
+  } catch(e){toast('Failed to stop','error');}
 }
 
-_engine_started = False
-_congress_started = False
-
-def get_week_key():
-    d = datetime.now(pytz.timezone('America/New_York'))
-    return f"{d.year}-W{d.isocalendar()[1]}"
-
-def is_market_hours():
-    est = datetime.now(pytz.timezone('America/New_York'))
-    h, m = est.hour, est.minute
-    # 9:30am to 4:00pm EST
-    after_open = (h > 9 or (h == 9 and m >= 30))
-    before_close = (h < 16)
-    return after_open and before_close
-
-def reset_if_needed():
-    today = datetime.now(pytz.timezone('America/New_York')).strftime('%Y-%m-%d')
-    if engine_state['last_date'] != today:
-        engine_state['today_pl'] = 0.0
-        engine_state['last_date'] = today
-    wk = get_week_key()
-    if engine_state['week_key'] != wk:
-        engine_state['weekly_trades'] = []
-        engine_state['week_key'] = wk
-
-def get_real_today_pl():
-    """Get actual today P&L from Alpaca account"""
-    try:
-        res = requests.get(f"{ALPACA_BASE_URL}/account", headers=alpaca_hdrs(), timeout=10)
-        if not res.ok:
-            return engine_state['today_pl']
-        data = res.json()
-        # equity - last_equity = today's P&L
-        equity = float(data.get('equity', 0))
-        last_equity = float(data.get('last_equity', equity))
-        today_pl = equity - last_equity
-        return today_pl
-    except:
-        return engine_state['today_pl']
-
-def alpaca_hdrs():
-    return {'APCA-API-KEY-ID': ALPACA_KEY, 'APCA-API-SECRET-KEY': ALPACA_SECRET, 'Content-Type': 'application/json'}
-
-def log_scan(msg):
-    est = datetime.now(pytz.timezone('America/New_York'))
-    entry = f"{est.strftime('%I:%M:%S %p')} — {msg}"
-    engine_state['scan_log'].insert(0, entry)
-    engine_state['scan_log'] = engine_state['scan_log'][:50]
-    logger.info(msg)
-
-def log_congress(msg):
-    est = datetime.now(pytz.timezone('America/New_York'))
-    entry = f"{est.strftime('%I:%M:%S %p')} — {msg}"
-    congress_state['scan_log'].insert(0, entry)
-    congress_state['scan_log'] = congress_state['scan_log'][:50]
-    logger.info(f"[CONGRESS] {msg}")
-
-def send_email(symbol, side, qty, price, reason, verdict):
-    try:
-        requests.post("https://api.emailjs.com/api/v1.0/email/send", json={
-            "service_id": EMAILJS_SERVICE, "template_id": EMAILJS_TEMPLATE, "user_id": EMAILJS_PUBLIC,
-            "template_params": {
-                "to_email": ALERT_EMAIL,
-                "subject": f"🤖 Precision Alpha: {verdict} — {side.upper()} {qty} {symbol}",
-                "trade_symbol": symbol, "trade_side": side.upper(), "trade_qty": qty,
-                "trade_price": f"${price:.2f}", "trade_total": f"${price*qty:.2f}",
-                "trade_reason": reason, "trade_verdict": verdict,
-                "trade_time": datetime.now(pytz.timezone('America/New_York')).strftime('%Y-%m-%d %I:%M %p EST'),
-                "stop_loss": f"${price-(RULES['maxLossPerTrade']/qty):.2f}",
-                "take_profit": f"${price+(RULES['takeProfitTarget']/qty):.2f}",
-            }
-        }, timeout=10)
-    except Exception as e:
-        logger.error(f"Email failed: {e}")
-
-def check_and_sell_positions():
-    """Auto-sell positions that hit take profit or stop loss"""
-    try:
-        res = requests.get(f"{ALPACA_BASE_URL}/positions", headers=alpaca_hdrs(), timeout=10)
-        if not res.ok:
-            return
-        positions = res.json()
-        if not positions:
-            return
-
-        for pos in positions:
-            symbol = pos.get('symbol')
-            qty = abs(int(float(pos.get('qty', 0))))
-            unrealized_pl = float(pos.get('unrealized_pl', 0))
-            current_price = float(pos.get('current_price', 0))
-
-            if qty == 0:
-                continue
-
-            should_sell = False
-            reason = ''
-
-            # Calculate per-share P&L
-            qty_pos = abs(int(float(pos.get('qty', 1))))
-            avg_entry = float(pos.get('avg_entry_price', 0))
-            current_price = float(pos.get('current_price', 0))
-            per_share_pl = current_price - avg_entry if avg_entry > 0 else 0
-            pct_gain = ((current_price - avg_entry) / avg_entry * 100) if avg_entry > 0 else 0
-
-            if per_share_pl <= -RULES['maxLossPerTrade']:
-                should_sell = True
-                reason = f"Stop loss: ${per_share_pl:.2f}/share ({pct_gain:.1f}%)"
-            elif pct_gain >= RULES['takeProfitPct']:
-                should_sell = True
-                reason = f"Take profit: +${per_share_pl:.2f}/share (+{pct_gain:.1f}%)"
-
-            if should_sell:
-                log_scan(f"💰 {symbol} — {reason}. Selling {qty} shares...")
-                sell = requests.post(f"{ALPACA_BASE_URL}/orders", headers=alpaca_hdrs(),
-                    json={"symbol": symbol, "qty": str(qty), "side": "sell", "type": "market", "time_in_force": "day"}, timeout=10)
-                if sell.ok:
-                    log_scan(f"✅ SOLD {qty} {symbol} @ ${current_price:.2f} | P&L: ${unrealized_pl:.2f}")
-                    entry = f"{datetime.now(pytz.timezone('America/New_York')).strftime('%I:%M %p')} · AUTO SELL: {qty} {symbol} @ ${current_price:.2f} | {reason}"
-                    engine_state['trade_log'].insert(0, entry)
-                    engine_state['trade_log'] = engine_state['trade_log'][:50]
-                    engine_state['today_pl'] += unrealized_pl
-                    send_email(symbol, 'sell', qty, current_price, reason, 'AUTO SELL')
-                else:
-                    log_scan(f"❌ Failed to sell {symbol}")
-    except Exception as e:
-        logger.error(f"Auto-sell error: {e}")
-
-def quick_ai_check(symbol, price, price_change):
-    prompt = f"""Precision Alpha AI auto-scanner. Evaluate for paper trade.
-Stock: {symbol} | Price: ${price:.2f} | 1-day change: ${price_change:.2f} ({(price_change/max(price,1)*100):.1f}%)
-Respond ONLY with JSON (no markdown): {{"confidence":0-100,"volatility":0-100,"sync":0-100,"side":"buy" or "sell","reason":"one sentence"}}
-Be very aggressive. Almost all stocks should pass. confidence>30, volatility<90, sync>30 required."""
-    res = requests.post("https://api.anthropic.com/v1/messages",
-        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
-        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 150, "messages": [{"role": "user", "content": prompt}]},
-        timeout=20)
-    text = res.json()['content'][0]['text'].replace('```json','').replace('```','').strip()
-    return json.loads(text)
-
-def auto_scan():
-    reset_if_needed()
-    if not is_market_hours():
-        log_scan("⏰ Outside trading hours — scan skipped"); return
-
-    # ALWAYS check and sell positions first — even if daily loss limit hit
-    check_and_sell_positions()
-
-    real_pl = get_real_today_pl()
-    engine_state['today_pl'] = real_pl
-    if real_pl <= -RULES['maxDailyLoss']:
-        log_scan(f"🔴 Daily loss limit hit (P&L: ${real_pl:.2f}) — no new buys"); return
-
-    log_scan(f"🔍 Scanning {len(MARKET_SCAN_LIST)} stocks...")
-    for symbol in MARKET_SCAN_LIST:
-        try:
-            qr = requests.get(f"{ALPACA_DATA_URL}/stocks/{symbol}/trades/latest", headers=alpaca_hdrs(), timeout=10)
-            if not qr.ok: continue
-            price = qr.json().get('trade', {}).get('p', 0)
-            if not price or price < 5 or price > 500: continue
-
-            end = datetime.utcnow().isoformat() + 'Z'
-            start = (datetime.utcnow() - timedelta(days=3)).isoformat() + 'Z'
-            br = requests.get(f"{ALPACA_DATA_URL}/stocks/{symbol}/bars?timeframe=1Day&start={start}&end={end}&limit=5", headers=alpaca_hdrs(), timeout=10)
-            price_change = 0
-            if br.ok:
-                bars = br.json().get('bars', [])
-                if len(bars) >= 2: price_change = bars[-1]['c'] - bars[-2]['c']
-
-            try:
-                ai = quick_ai_check(symbol, price, price_change)
-            except: continue
-
-            conf, vol, sync = ai.get('confidence',0), ai.get('volatility',100), ai.get('sync',0)
-            side, reason = ai.get('side','buy'), ai.get('reason','')
-
-            if conf < RULES['minConfidence'] or vol > RULES['maxVolatility'] or sync < RULES['minSyncScore']:
-                log_scan(f"⚫ {symbol} — blocked (C:{conf} V:{vol} S:{sync})"); continue
-
-            # Check current position size — max 5 shares per stock
-            try:
-                pos_res = requests.get(f"{ALPACA_BASE_URL}/positions/{symbol}", headers=alpaca_hdrs(), timeout=10)
-                current_qty = int(float(pos_res.json().get('qty', 0))) if pos_res.ok else 0
-            except:
-                current_qty = 0
-
-            if current_qty >= RULES['maxSharesPerStock']:
-                log_scan(f"⏭ {symbol} — max {RULES['maxSharesPerStock']} shares held, skipping")
-                continue
-
-            qty = 1  # Always buy 1 share at a time
-            log_scan(f"✅ {symbol} — {side.upper()} signal. Placing... (holding {current_qty}/{RULES['maxSharesPerStock']})")
-
-            or_ = requests.post(f"{ALPACA_BASE_URL}/orders", headers=alpaca_hdrs(),
-                json={"symbol": symbol, "qty": str(qty), "side": side, "type": "market", "time_in_force": "day"}, timeout=10)
-            if not or_.ok:
-                log_scan(f"❌ {symbol} — order failed"); continue
-
-            engine_state['weekly_trades'].append({'symbol': symbol, 'side': side, 'qty': qty, 'price': price})
-            entry = f"{datetime.now(pytz.timezone('America/New_York')).strftime('%I:%M %p')} · AUTO: {side.upper()} {qty} {symbol} @ ${price:.2f} · {reason}"
-            engine_state['trade_log'].insert(0, entry)
-            engine_state['trade_log'] = engine_state['trade_log'][:50]
-            log_scan(f"🚀 ORDER PLACED: {side.upper()} {qty} {symbol} @ ${price:.2f}")
-            send_email(symbol, side, qty, price, reason, 'AUTO TRADE')
-            break
-        except Exception as e:
-            log_scan(f"⚫ {symbol} — {str(e)[:40]}"); continue
-        time.sleep(0.5)
-    log_scan("✓ Scan complete — next in 5 min")
-
-def engine_loop():
-    while engine_state['running']:
-        try: auto_scan()
-        except Exception as e: logger.error(f"Engine error: {e}")
-        time.sleep(300)
-
-def get_congress_trades():
-    """Fetch recent congressional trades from House Stock Watcher GitHub API"""
-    try:
-        # Try multiple free sources
-        urls = [
-            "https://house-stock-watcher-data.s3-us-east-2.amazonaws.com/data/all_transactions.json",
-            "https://raw.githubusercontent.com/ratemycongress/congressional-stock-trades/main/data/trades.json",
-        ]
-        
-        data = None
-        for url in urls:
-            try:
-                res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-                if res.ok:
-                    data = res.json()
-                    log_congress(f"Connected to: {url[:50]}...")
-                    break
-                else:
-                    log_congress(f"URL returned {res.status_code}, trying next...")
-            except:
-                continue
-        
-        if not data:
-            log_congress("All sources failed — using fallback stock list")
-            # Fallback: use popular stocks that congress frequently buys
-            return [
-                {'ticker': 'NVDA', 'action': 'buy'},
-                {'ticker': 'MSFT', 'action': 'buy'},
-                {'ticker': 'AAPL', 'action': 'buy'},
-                {'ticker': 'AMZN', 'action': 'buy'},
-                {'ticker': 'GOOGL', 'action': 'buy'},
-            ]
-
-        trades = []
-        seen = set()
-        recent = data[:100] if isinstance(data, list) else []
-        for item in recent:
-            ticker = item.get('ticker', '').strip().upper()
-            tx_type = str(item.get('type', '') or item.get('transaction_type', '')).lower()
-            if not ticker or ticker in ('--', 'N/A', '') or len(ticker) > 5:
-                continue
-            if ticker in seen:
-                continue
-            seen.add(ticker)
-            action = 'buy' if 'purchase' in tx_type or 'buy' in tx_type else 'sell'
-            trades.append({'ticker': ticker, 'action': action})
-        
-        log_congress(f"Found {len(trades)} unique tickers")
-        return trades[:20]
-    except Exception as e:
-        log_congress(f"Error: {str(e)[:50]}")
-        return []
-
-def congress_scan():
-    today = datetime.now(pytz.timezone('America/New_York')).strftime('%Y-%m-%d')
-    if congress_state['last_scan'] == today:
-        log_congress("Already scanned today — skipping")
-        return
-
-    if not is_market_hours():
-        log_congress("⏰ Outside market hours — will copy when market opens")
-        return
-
-    log_congress("🏛️ Fetching congressional trades from Senate Stock Watcher...")
-    trades = get_congress_trades()
-
-    if not trades:
-        log_congress("No trades found or error fetching data")
-        return
-
-    log_congress(f"Found {len(trades)} recent congressional trades")
-    bought = 0
-
-    for trade in trades:
-        ticker = trade['ticker']
-        action = trade['action']
-
-        if action != 'buy':
-            continue
-
-        trade_key = f"{today}_{ticker}"
-        if trade_key in congress_state['copied_trades']:
-            continue
-
-        if bought >= 3:
-            break
-
-        try:
-            qr = requests.get(f"{ALPACA_DATA_URL}/stocks/{ticker}/trades/latest", headers=alpaca_hdrs(), timeout=10)
-            if not qr.ok:
-                continue
-            price = qr.json().get('trade', {}).get('p', 0)
-            if not price or price < 1 or price > 1000:
-                continue
-
-            qty = max(1, int(RULES['maxPositionSize'] / price))
-            log_congress(f"📋 Copying congressional BUY: {ticker} @ ${price:.2f}")
-
-            or_ = requests.post(f"{ALPACA_BASE_URL}/orders", headers=alpaca_hdrs(),
-                json={"symbol": ticker, "qty": str(qty), "side": "buy", "type": "market", "time_in_force": "day"}, timeout=10)
-
-            if or_.ok:
-                congress_state['copied_trades'].append(trade_key)
-                entry = f"{datetime.now(pytz.timezone('America/New_York')).strftime('%I:%M %p')} · CONGRESS COPY: BUY {qty} {ticker} @ ${price:.2f}"
-                congress_state['trade_log'].insert(0, entry)
-                congress_state['trade_log'] = congress_state['trade_log'][:50]
-                log_congress(f"✅ ORDER PLACED: BUY {qty} {ticker} @ ${price:.2f}")
-                send_email(ticker, 'buy', qty, price, 'Congressional trade copy', 'CONGRESS COPY')
-                bought += 1
-            else:
-                log_congress(f"❌ Order failed for {ticker}")
-
-        except Exception as e:
-            log_congress(f"Error copying {ticker}: {str(e)[:40]}")
-            continue
-
-        time.sleep(1)
-
-    congress_state['last_scan'] = today
-    log_congress(f"✓ Congressional scan complete — copied {bought} trades")
-
-def congress_loop():
-    while congress_state['running']:
-        try:
-            congress_scan()
-        except Exception as e:
-            logger.error(f"Congress engine error: {e}")
-        time.sleep(3600)
-
-@app.route("/")
-def index():
-    return jsonify({"app": "Precision Alpha AI Backend", "status": "running", "mode": "paper-only"})
-
-@app.route("/api/engine/start", methods=["POST"])
-def start_engine():
-    if not engine_state['running']:
-        engine_state['running'] = True
-        threading.Thread(target=engine_loop, daemon=True).start()
-        log_scan("🚀 Auto engine started")
-    return jsonify({"status": "running"})
-
-@app.route("/api/engine/stop", methods=["POST"])
-def stop_engine():
-    engine_state['running'] = False
-    log_scan("⏹ Auto engine stopped")
-    return jsonify({"status": "stopped"})
-
-@app.route("/api/engine/kill", methods=["POST"])
-def kill_engine():
-    engine_state['running'] = False
-    congress_state['running'] = False
-    log_scan("⛔ KILL SWITCH activated")
-    return jsonify({"status": "killed"})
-
-@app.route("/api/engine/status")
-def engine_status():
-    return jsonify({
-        "running": engine_state['running'],
-        "weekly_trades": len(engine_state['weekly_trades']),
-        "today_pl": engine_state['today_pl'],
-        "scan_log": engine_state['scan_log'][:30],
-        "trade_log": engine_state['trade_log'][:20],
-        "is_market_hours": is_market_hours(),
-    })
-
-@app.route("/api/congress/status")
-def congress_status():
-    return jsonify({
-        "running": congress_state['running'],
-        "last_scan": congress_state['last_scan'],
-        "scan_log": congress_state['scan_log'][:20],
-        "trade_log": congress_state['trade_log'][:20],
-        "copied_today": len([t for t in congress_state['copied_trades'] if t.startswith(datetime.now(pytz.timezone('America/New_York')).strftime('%Y-%m-%d'))]),
-    })
-
-@app.route("/api/congress/start", methods=["POST"])
-def start_congress():
-    if not congress_state['running']:
-        congress_state['running'] = True
-        threading.Thread(target=congress_loop, daemon=True).start()
-        log_congress("🏛️ Congressional copy engine started")
-    return jsonify({"status": "running"})
-
-@app.route("/api/congress/stop", methods=["POST"])
-def stop_congress():
-    congress_state['running'] = False
-    log_congress("⏹ Congressional copy engine stopped")
-    return jsonify({"status": "stopped"})
-
-@app.route("/api/congress/scan", methods=["POST"])
-def manual_congress_scan():
-    congress_state['last_scan'] = ''
-    threading.Thread(target=congress_scan, daemon=True).start()
-    return jsonify({"status": "scanning"})
-
-@app.route("/api/bars/<symbol>")
-def get_bars(symbol):
-    try:
-        res = requests.get(f"{ALPACA_DATA_URL}/stocks/{symbol}/bars?timeframe=1Day&start={request.args.get('start','')}&end={request.args.get('end','')}&limit=5", headers=alpaca_hdrs(), timeout=10)
-        return jsonify(res.json()), res.status_code
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route("/api/quote/<symbol>")
-def get_quote(symbol):
-    try:
-        res = requests.get(f"{ALPACA_DATA_URL}/stocks/{symbol}/trades/latest", headers=alpaca_hdrs(), timeout=10)
-        return jsonify(res.json()), res.status_code
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route("/api/account")
-def get_account():
-    try:
-        res = requests.get(f"{ALPACA_BASE_URL}/account", headers=alpaca_hdrs(), timeout=10)
-        return jsonify(res.json()), res.status_code
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route("/api/positions")
-def get_positions():
-    try:
-        res = requests.get(f"{ALPACA_BASE_URL}/positions", headers=alpaca_hdrs(), timeout=10)
-        return jsonify(res.json()), res.status_code
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route("/api/orders", methods=["GET","POST"])
-def orders():
-    try:
-        if request.method == "POST":
-            res = requests.post(f"{ALPACA_BASE_URL}/orders", headers=alpaca_hdrs(), json=request.get_json(), timeout=10)
-        else:
-            res = requests.get(f"{ALPACA_BASE_URL}/orders?status={request.args.get('status','all')}&limit={request.args.get('limit','50')}", headers=alpaca_hdrs(), timeout=10)
-        return jsonify(res.json()), res.status_code
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route("/api/ai/analyze", methods=["POST"])
-def ai_analyze():
-    try:
-        data = request.get_json()
-        res = requests.post("https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": data.get("max_tokens", 500), "messages": [{"role": "user", "content": data.get("prompt", "")}]},
-            timeout=25)
-        return jsonify(res.json()), res.status_code
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-
-
-@app.route("/api/settings/get")
-def get_settings():
-    return jsonify(RULES)
-
-@app.route("/api/settings/update", methods=["POST"])
-def update_settings():
-    data = request.get_json()
-    allowed = ['maxDailyLoss','maxTrades','maxPositionSize','maxLossPerTrade',
-               'takeProfitTarget','minConfidence','maxVolatility','minSyncScore',
-               'maxSharesPerStock','takeProfitPct']
-    updated = {}
-    for key in allowed:
-        if key in data:
-            RULES[key] = float(data[key])
-            updated[key] = RULES[key]
-    log_scan(f"⚙️ Settings updated: {updated}")
-    return jsonify({"status": "updated", "rules": RULES})
-
-
-# Win Rate Tracker
-@app.route("/api/trades/history")
-def get_trade_history():
-    """Get closed orders and calculate win rate stats"""
-    try:
-        res = requests.get(
-            f"{ALPACA_BASE_URL}/orders?status=closed&limit=100&direction=desc",
-            headers=alpaca_hdrs(), timeout=10
-        )
-        if not res.ok:
-            return jsonify({"error": "Failed to fetch orders"}), 500
-        
-        orders = res.json()
-        
-        # Filter only filled sell orders
-        sells = [o for o in orders if o.get('side') == 'sell' and o.get('status') == 'filled']
-        buys = {o.get('symbol'): o for o in orders if o.get('side') == 'buy' and o.get('status') == 'filled'}
-        
-        trades = []
-        wins = 0
-        losses = 0
-        total_gain = 0
-        total_loss = 0
-        
-        for sell in sells:
-            symbol = sell.get('symbol')
-            sell_price = float(sell.get('filled_avg_price') or 0)
-            qty = float(sell.get('filled_qty') or 0)
-            
-            # Find matching buy
-            buy = buys.get(symbol)
-            if not buy:
-                continue
-                
-            buy_price = float(buy.get('filled_avg_price') or 0)
-            if not buy_price or not sell_price:
-                continue
-                
-            pl = (sell_price - buy_price) * qty
-            pct = ((sell_price - buy_price) / buy_price) * 100
-            
-            trade = {
-                'symbol': symbol,
-                'buy_price': buy_price,
-                'sell_price': sell_price,
-                'qty': qty,
-                'pl': round(pl, 2),
-                'pct': round(pct, 2),
-                'win': pl > 0,
-                'date': sell.get('filled_at', '')[:10] if sell.get('filled_at') else '',
-            }
-            trades.append(trade)
-            
-            if pl > 0:
-                wins += 1
-                total_gain += pl
-            else:
-                losses += 1
-                total_loss += abs(pl)
-        
-        total_trades = wins + losses
-        win_rate = round((wins / total_trades * 100), 1) if total_trades > 0 else 0
-        avg_gain = round(total_gain / wins, 2) if wins > 0 else 0
-        avg_loss = round(total_loss / losses, 2) if losses > 0 else 0
-        reward_risk = round(avg_gain / avg_loss, 2) if avg_loss > 0 else 0
-        
-        return jsonify({
-            'trades': trades[:50],
-            'stats': {
-                'total_trades': total_trades,
-                'wins': wins,
-                'losses': losses,
-                'win_rate': win_rate,
-                'avg_gain': avg_gain,
-                'avg_loss': avg_loss,
-                'reward_risk': reward_risk,
-                'total_pl': round(total_gain - total_loss, 2),
-            }
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/news/<symbol>")
-def get_news(symbol):
-    """Get latest news for a stock symbol"""
-    try:
-        res = requests.get(
-            f"https://data.alpaca.markets/v1beta1/news?symbols={symbol}&limit=5",
-            headers=alpaca_hdrs(), timeout=10
-        )
-        if res.ok:
-            return jsonify(res.json()), 200
-        return jsonify({"news": []}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/news/market")
-def get_market_news():
-    """Get latest general market news"""
-    try:
-        res = requests.get(
-            f"https://data.alpaca.markets/v1beta1/news?limit=10",
-            headers=alpaca_hdrs(), timeout=10
-        )
-        if res.ok:
-            return jsonify(res.json()), 200
-        return jsonify({"news": []}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Benchmark state — persists in memory (resets on server restart)
-benchmark_state = {
-    'real_value': 0.0,
-    'history': [],
+async function loadCongressStatus() {
+  try {
+    const res = await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/congress/status');
+    const data = await res.json();
+    const feed=qs('#congressFeed');
+    if(feed&&data.scan_log&&data.scan_log.length){
+      feed.innerHTML=data.scan_log.map(x=>`<div class="logitem">${x}</div>`).join('');
+    }
+    const tlog=qs('#congressTradeLog');
+    if(tlog){
+      tlog.innerHTML=data.trade_log&&data.trade_log.length?data.trade_log.map(x=>`<div class="logitem">${x}</div>`).join(''):'<div class="logitem">No congressional trades copied yet.</div>';
+    }
+    const copied=qs('#congressCopiedToday');if(copied)copied.textContent=data.copied_today||0;
+    if(data.running){
+      const dot=qs('#congressDot');if(dot){dot.style.background='#67ff74';dot.style.boxShadow='0 0 8px #67ff74';}
+      const status=qs('#congressStatus');if(status)status.textContent='CONGRESS ENGINE RUNNING';
+      const btn=qs('#congressStartBtn');if(btn&&btn.textContent.includes('Start')){btn.textContent='⏹ Stop Congress Engine';btn.style.background='rgba(255,79,79,.2)';btn.style.color='#ff4f4f';btn.style.border='1px solid rgba(255,79,79,.4)';}
+    }
+  } catch(e){console.error('Congress status failed:',e);}
 }
 
-@app.route("/api/benchmark/get")
-def get_benchmark():
-    return jsonify(benchmark_state)
+let congressRunning = false;
 
-@app.route("/api/benchmark/update", methods=["POST"])
-def update_benchmark():
-    data = request.get_json()
-    val = float(data.get('real_value', 0))
-    benchmark_state['real_value'] = val
-    benchmark_state['history'].insert(0, {
-        'date': datetime.now(pytz.timezone('America/New_York')).strftime('%m/%d/%Y'),
-        'time': datetime.now(pytz.timezone('America/New_York')).strftime('%I:%M:%S %p'),
-        'real_value': val,
-    })
-    benchmark_state['history'] = benchmark_state['history'][:30]
-    return jsonify({"status": "saved", "real_value": val})
 
-# Auto-start engines on boot — only once
-if not _engine_started:
-    _engine_started = True
-    engine_state['running'] = True
-    threading.Thread(target=engine_loop, daemon=True).start()
-    log_scan("🚀 Auto engine started on server boot")
+// Benchmark Dashboard
+const BM_STORAGE_KEY = 'precision_alpha_benchmark';
 
-if not _congress_started:
-    _congress_started = True
-    congress_state['running'] = True
-    threading.Thread(target=congress_loop, daemon=True).start()
-    log_congress("🏛️ Congressional copy engine started on server boot")
+const BM_API = 'https://precision-alpha-backend-hs6g.onrender.com';
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+async function updateRealPortfolio() {
+  const input = qs('#bmRealInput');
+  const val = parseFloat(input?.value);
+  if (!val || val < 0) { toast('Enter a valid portfolio value', 'error'); return; }
+  try {
+    await fetch(BM_API + '/api/benchmark/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({real_value: val})
+    });
+    toast('Real portfolio updated!', 'success');
+    if(input) input.value = '';
+    loadBenchmark();
+  } catch(e) { toast('Failed to save', 'error'); }
+}
+
+async function loadBenchmark() {
+  try {
+    const res = await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/account');
+    const data = await res.json();
+    const paperBalance = parseFloat(data.portfolio_value || data.equity || 100000);
+    const paperPL = paperBalance - 100000;
+    const paperReturn = ((paperPL / 100000) * 100).toFixed(2);
+
+    const el = qs('#bmPaperBalance');
+    if(el) el.textContent = '$' + paperBalance.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    
+    const plEl = qs('#bmPaperPL');
+    if(plEl) {
+      plEl.textContent = (paperPL >= 0 ? '+' : '') + '$' + paperPL.toFixed(2);
+      plEl.style.color = paperPL >= 0 ? '#67ff74' : '#ff4f4f';
+    }
+    
+    const retEl = qs('#bmPaperReturn');
+    if(retEl) {
+      retEl.textContent = (paperReturn >= 0 ? '+' : '') + paperReturn + '%';
+      retEl.style.color = paperReturn >= 0 ? '#67ff74' : '#ff4f4f';
+    }
+
+    // Fetch real portfolio data from backend
+    const bmRes = await fetch(BM_API + '/api/benchmark/get');
+    const bmData = await bmRes.json();
+    const realValue = bmData.real_value || 0;
+    const history = bmData.history || [];
+
+    const realEl = qs('#bmRealBalance');
+    if(realEl) realEl.textContent = realValue > 0 ? '$' + realValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : 'Not set';
+
+    let realPL = 0;
+    let realReturn = 0;
+    if(history.length > 0) {
+      const startVal = history[history.length-1].real_value;
+      realPL = realValue - startVal;
+      realReturn = ((realPL / startVal) * 100).toFixed(2);
+    }
+
+    const realPlEl = qs('#bmRealPL');
+    if(realPlEl) {
+      realPlEl.textContent = realValue > 0 ? (realPL >= 0 ? '+' : '') + '$' + realPL.toFixed(2) : 'Enter value below';
+      realPlEl.style.color = realPL >= 0 ? '#f2bf4b' : '#ff4f4f';
+    }
+
+    const realRetEl = qs('#bmRealReturn');
+    if(realRetEl) {
+      realRetEl.textContent = realValue > 0 ? (realReturn >= 0 ? '+' : '') + realReturn + '%' : '--';
+      realRetEl.style.color = parseFloat(realReturn) >= 0 ? '#f2bf4b' : '#ff4f4f';
+    }
+
+    const winnerEl = qs('#bmWinner');
+    if(winnerEl && realValue > 0) {
+      if(parseFloat(paperReturn) > parseFloat(realReturn)) {
+        winnerEl.textContent = '🤖 Paper'; winnerEl.style.color = '#67ff74';
+      } else {
+        winnerEl.textContent = '💼 Real'; winnerEl.style.color = '#f2bf4b';
+      }
+    }
+
+    const histEl = qs('#bmHistory');
+    if(histEl && history.length > 0) {
+      histEl.innerHTML = history.map(h => 
+        `<div class="logitem">${h.date} ${h.time} — Real: $${parseFloat(h.real_value).toLocaleString()}</div>`
+      ).join('');
+    }
+  } catch(e) { console.error('Benchmark load error:', e); }
+}
+
+
+const SETTINGS_API = 'https://precision-alpha-backend-hs6g.onrender.com';
+
+async function loadSettings() {
+  try {
+    const res = await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/settings/get');
+    const data = await res.json();
+    console.log('Settings loaded:', data);
+    const fields = {
+      maxLossPerTrade: 'set_maxLossPerTrade',
+      takeProfitPct: 'set_takeProfitPct',
+      maxDailyLoss: 'set_maxDailyLoss',
+      maxSharesPerStock: 'set_maxSharesPerStock',
+      maxPositionSize: 'set_maxPositionSize',
+      minConfidence: 'set_minConfidence',
+      maxVolatility: 'set_maxVolatility',
+      minSyncScore: 'set_minSyncScore',
+    };
+    for(const [key, id] of Object.entries(fields)) {
+      const el = document.getElementById(id);
+      if(el && data[key] !== undefined) {
+        el.value = data[key];
+        console.log('Set', id, '=', data[key]);
+      }
+    }
+  } catch(e) { 
+    console.error('Settings load error:', e);
+    // Use defaults if backend fails
+    const defaults = {
+      set_maxLossPerTrade: 9,
+      set_takeProfitPct: 15,
+      set_maxDailyLoss: 30,
+      set_maxSharesPerStock: 5,
+      set_maxPositionSize: 200,
+      set_minConfidence: 30,
+      set_maxVolatility: 90,
+      set_minSyncScore: 30,
+    };
+    for(const [id, val] of Object.entries(defaults)) {
+      const el = document.getElementById(id);
+      if(el) el.value = val;
+    }
+  }
+}
+
+async function saveSettings() {
+  const fields = {
+    maxLossPerTrade: 'set_maxLossPerTrade',
+    takeProfitPct: 'set_takeProfitPct',
+    maxDailyLoss: 'set_maxDailyLoss',
+    maxSharesPerStock: 'set_maxSharesPerStock',
+    maxPositionSize: 'set_maxPositionSize',
+    minConfidence: 'set_minConfidence',
+    maxVolatility: 'set_maxVolatility',
+    minSyncScore: 'set_minSyncScore',
+  };
+  const payload = {};
+  for(const [key, id] of Object.entries(fields)) {
+    const el = document.getElementById(id);
+    if(el && el.value) payload[key] = parseFloat(el.value);
+  }
+  try {
+    const res = await fetch(SETTINGS_API + '/api/settings/update', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    const status = document.getElementById('settingsStatus');
+    if(status) { status.textContent = '✅ Settings saved successfully!'; status.style.color = '#67ff74'; }
+    toast('Settings saved!', 'success');
+  } catch(e) {
+    const status = document.getElementById('settingsStatus');
+    if(status) { status.textContent = '❌ Failed to save settings'; status.style.color = '#ff4f4f'; }
+    toast('Failed to save settings', 'error');
+  }
+}
+
+async function lookupStock() {
+  const symbol = document.getElementById('mt_symbol')?.value?.toUpperCase()?.trim();
+  if(!symbol) { toast('Enter a ticker symbol', 'error'); return; }
+  try {
+    const res = await fetch(SETTINGS_API + '/api/quote/' + symbol);
+    const data = await res.json();
+    const price = data?.trade?.p || 0;
+    const quoteEl = document.getElementById('mt_quote');
+    if(quoteEl) quoteEl.style.display = 'block';
+    const symEl = document.getElementById('mt_q_symbol');
+    if(symEl) symEl.textContent = symbol;
+    const priceEl = document.getElementById('mt_q_price');
+    if(priceEl) priceEl.textContent = '$' + price.toFixed(2);
+    const costEl = document.getElementById('mt_q_cost');
+    if(costEl) costEl.textContent = '$' + price.toFixed(2);
+  } catch(e) { toast('Failed to look up stock', 'error'); }
+}
+
+async function placeManualTrade(side) {
+  const symbol = document.getElementById('mt_symbol')?.value?.toUpperCase()?.trim();
+  const qty = document.getElementById('mt_qty')?.value;
+  if(!symbol) { toast('Enter a ticker symbol', 'error'); return; }
+  if(!qty || qty < 1) { toast('Enter a valid quantity', 'error'); return; }
+  try {
+    const res = await fetch(SETTINGS_API + '/api/orders', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({symbol, qty: String(qty), side, type: 'market', time_in_force: 'day'})
+    });
+    const data = await res.json();
+    if(data.id || data.status) {
+      toast(`✅ ${side.toUpperCase()} ${qty} ${symbol} order placed!`, 'success');
+      loadManualPositions();
+    } else {
+      toast('Order failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+  } catch(e) { toast('Failed to place order', 'error'); }
+}
+
+async function loadManualPositions() {
+  try {
+    const res = await fetch(SETTINGS_API + '/api/positions');
+    const positions = await res.json();
+    const el = document.getElementById('mt_positions');
+    if(!el) return;
+    if(!positions || !positions.length) { el.innerHTML = '<div class="logitem">No open positions</div>'; return; }
+    el.innerHTML = positions.map(p => {
+      const pl = parseFloat(p.unrealized_pl || 0);
+      const qty = parseInt(p.qty || 0);
+      const symbol = p.symbol;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #202838">
+        <div>
+          <strong>${symbol}</strong>
+          <span style="color:var(--muted);font-size:12px;margin-left:8px">${qty} shares</span>
+          <span style="margin-left:8px;font-size:13px;color:${pl>=0?'#67ff74':'#ff4f4f'}">${pl>=0?'+':''}$${pl.toFixed(2)}</span>
+        </div>
+        <button onclick="quickSell('${symbol}',${qty})" style="background:rgba(255,79,79,.2);color:#ff4f4f;border:1px solid rgba(255,79,79,.4);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px">SELL ALL</button>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('Positions load error:', e); }
+}
+
+async function quickSell(symbol, qty) {
+  try {
+    const res = await fetch(SETTINGS_API + '/api/orders', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({symbol, qty: String(qty), side: 'sell', type: 'market', time_in_force: 'day'})
+    });
+    const data = await res.json();
+    if(data.id || data.status) {
+      toast(`✅ SELL ${qty} ${symbol} order placed!`, 'success');
+      setTimeout(loadManualPositions, 2000);
+    } else {
+      toast('Order failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+  } catch(e) { toast('Failed to place sell order', 'error'); }
+}
+
+
+const WR_API = 'https://precision-alpha-backend-hs6g.onrender.com';
+
+async function loadWinRate() {
+  try {
+    const res = await fetch(WR_API + '/api/trades/history');
+    const data = await res.json();
+    const s = data.stats;
+    
+    const wrEl = document.getElementById('wr_winrate');
+    if(wrEl) { wrEl.textContent = s.win_rate + '%'; wrEl.style.color = s.win_rate >= 50 ? '#67ff74' : '#ff4f4f'; }
+    
+    const rrEl = document.getElementById('wr_rr');
+    if(rrEl) { rrEl.textContent = s.reward_risk + ':1'; rrEl.style.color = s.reward_risk >= 1 ? '#f2bf4b' : '#ff4f4f'; }
+    
+    const ids = {wr_total: s.total_trades, wr_wins: s.wins, wr_losses: s.losses, 
+                 wr_avggain: '+$' + s.avg_gain, wr_avgloss: '-$' + s.avg_loss,
+                 wr_totalpl: (s.total_pl >= 0 ? '+' : '') + '$' + s.total_pl};
+    for(const [id, val] of Object.entries(ids)) {
+      const el = document.getElementById(id);
+      if(el) el.textContent = val;
+    }
+    
+    // Performance rating
+    const ratingEl = document.getElementById('wr_rating');
+    const ratingText = document.getElementById('wr_rating_text');
+    let emoji, text;
+    if(s.win_rate >= 60 && s.reward_risk >= 1.5) { emoji = '🏆'; text = 'Elite Trader'; }
+    else if(s.win_rate >= 50 && s.reward_risk >= 1) { emoji = '✅'; text = 'Profitable Trader'; }
+    else if(s.win_rate >= 40) { emoji = '📈'; text = 'Developing Trader'; }
+    else { emoji = '🔧'; text = 'Needs Improvement'; }
+    if(ratingEl) ratingEl.querySelector('div').textContent = emoji;
+    if(ratingText) ratingText.textContent = text;
+    
+    // Trade list
+    const tradesEl = document.getElementById('wr_trades');
+    if(tradesEl && data.trades && data.trades.length) {
+      tradesEl.innerHTML = data.trades.map(t => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #202838;flex-wrap:wrap;gap:6px">
+          <div>
+            <strong>${t.symbol}</strong>
+            <span style="color:var(--muted);font-size:12px;margin-left:8px">${t.date}</span>
+          </div>
+          <div style="display:flex;gap:12px;font-size:13px">
+            <span style="color:var(--muted)">Buy: $${t.buy_price}</span>
+            <span style="color:var(--muted)">Sell: $${t.sell_price}</span>
+            <span style="color:${t.win ? '#67ff74' : '#ff4f4f'};font-weight:700">${t.pl >= 0 ? '+' : ''}$${t.pl} (${t.pct >= 0 ? '+' : ''}${t.pct}%)</span>
+            <span style="background:${t.win ? 'rgba(103,255,116,.15)' : 'rgba(255,79,79,.15)'};color:${t.win ? '#67ff74' : '#ff4f4f'};padding:2px 8px;border-radius:4px;font-size:11px">${t.win ? 'WIN' : 'LOSS'}</span>
+          </div>
+        </div>`).join('');
+    } else {
+      if(tradesEl) tradesEl.innerHTML = '<div class="logitem">No closed trades yet</div>';
+    }
+  } catch(e) { console.error('Win rate load error:', e); }
+}
+
+function formatNewsItem(item) {
+  const date = item.created_at ? new Date(item.created_at).toLocaleDateString() : '';
+  return `<div style="padding:12px 0;border-bottom:1px solid #202838">
+    <div style="font-size:14px;font-weight:600;margin-bottom:4px;line-height:1.4">${item.headline || item.title || 'No title'}</div>
+    <div style="display:flex;gap:10px;font-size:12px;color:var(--muted)">
+      <span>${item.source || ''}</span>
+      <span>${date}</span>
+      ${item.symbols ? '<span>' + item.symbols.join(', ') + '</span>' : ''}
+    </div>
+    ${item.summary ? '<div style="font-size:13px;color:#a8b0bd;margin-top:6px;line-height:1.5">' + item.summary.slice(0, 150) + '...</div>' : ''}
+    ${item.url ? '<a href="' + item.url + '" target="_blank" style="font-size:12px;color:#f2bf4b;text-decoration:none;margin-top:4px;display:inline-block">Read more →</a>' : ''}
+  </div>`;
+}
+
+async function loadStockNews() {
+  const symbol = document.getElementById('news_symbol')?.value?.toUpperCase()?.trim();
+  if(!symbol) { toast('Enter a ticker symbol', 'error'); return; }
+  const el = document.getElementById('stock_news');
+  if(el) el.innerHTML = '<div class="logitem">Loading news for ' + symbol + '...</div>';
+  try {
+    const res = await fetch(WR_API + '/api/news/' + symbol);
+    const data = await res.json();
+    const news = data.news || [];
+    if(el) el.innerHTML = news.length ? news.map(formatNewsItem).join('') : '<div class="logitem">No recent news for ' + symbol + '</div>';
+  } catch(e) { if(el) el.innerHTML = '<div class="logitem">Failed to load news</div>'; }
+}
+
+async function loadMarketNews() {
+  const el = document.getElementById('market_news');
+  if(el) el.innerHTML = '<div class="logitem">Loading market news...</div>';
+  try {
+    const res = await fetch(WR_API + '/api/news/market');
+    const data = await res.json();
+    const news = data.news || [];
+    if(el) el.innerHTML = news.length ? news.map(formatNewsItem).join('') : '<div class="logitem">No market news available</div>';
+  } catch(e) { if(el) el.innerHTML = '<div class="logitem">Failed to load news</div>'; }
+}
+
+let statusPollInterval=null;
+async function startPollingStatus(){
+  if(statusPollInterval)clearInterval(statusPollInterval);
+  statusPollInterval=setInterval(async()=>{
+    try{
+      const res=await fetch('https://precision-alpha-backend-hs6g.onrender.com/api/engine/status');
+      const data=await res.json();
+      // Update scan feed
+      const feed=qs('#autoFeed');
+      if(feed&&data.scan_log&&data.scan_log.length){
+        feed.innerHTML=data.scan_log.map(x=>`<div class="logitem">${x}</div>`).join('');
+      }
+      // Update trade log
+      const tlog=qs('#autoTradeLog');
+      if(tlog&&data.trade_log&&data.trade_log.length){
+        tlog.innerHTML=data.trade_log.map(x=>`<div class="logitem">${x}</div>`).join('');
+      }
+      // Update engine status indicator
+      const status=qs('#autoStatus');
+      if(status){
+        if(data.running){
+          status.textContent='AUTO ENGINE RUNNING ON SERVER — scanning every 5 minutes';
+          const dot=qs('#autoDot');if(dot){dot.style.background='#67ff74';dot.style.boxShadow='0 0 8px #67ff74';}
+          const btn=qs('#autoStartBtn');if(btn&&btn.textContent.includes('Start')){btn.textContent='⏹ Stop Auto Engine';btn.style.background='rgba(255,79,79,.2)';btn.style.color='#ff4f4f';btn.style.border='1px solid rgba(255,79,79,.4)';}
+          state.autoRunning=true;
+        }
+      }
+    }catch(e){console.error('Status poll failed:',e);}
+  },10000);
+}
+
+window.addEventListener('load',()=>{
+  // Check if engine is already running on server
+  fetch('https://precision-alpha-backend-hs6g.onrender.com/api/engine/status').then(r=>r.json()).then(data=>{
+    if(data.running){
+      state.autoRunning=true;
+      const btn=qs('#autoStartBtn');
+      if(btn){btn.textContent='⏹ Stop Auto Engine';btn.style.background='rgba(255,79,79,.2)';btn.style.color='#ff4f4f';btn.style.border='1px solid rgba(255,79,79,.4)';}
+      const dot=qs('#autoDot');if(dot){dot.style.background='#67ff74';dot.style.boxShadow='0 0 8px #67ff74';}
+      const status=qs('#autoStatus');if(status)status.textContent='AUTO ENGINE RUNNING ON SERVER';
+      startPollingStatus();
+    }
+  }).catch(()=>{});
+  // Check congress engine status
+  loadCongressStatus();
+  emailjs.init(EMAILJS_PUBLIC);
+  qsa('.nav').forEach(b=>b.addEventListener('click',()=>{showView(b.dataset.view);if(b.dataset.view==='environment')loadDashboard();if(b.dataset.view==='log')loadTradeLog();if(b.dataset.view==='auto'){renderWatchlist();renderAutoLog();}if(b.dataset.view==='congress'){loadCongressStatus();}if(b.dataset.view==='benchmark'){setTimeout(loadBenchmark, 100);}if(b.dataset.view==='settings'){loadSettings();}if(b.dataset.view==='winrate'){loadWinRate();}if(b.dataset.view==='news'){loadMarketNews();}if(b.dataset.view==='manualtrade'){loadManualPositions();}}));
+  qs('#refreshBtn')?.addEventListener('click',loadDashboard);
+  qs('#refreshLog')?.addEventListener('click',loadTradeLog);
+  qs('#checkGateBtn')?.addEventListener('click',checkGate);
+  qs('#submitTradeBtn')?.addEventListener('click',submitTrade);
+  qs('#tradeOrderType')?.addEventListener('change',()=>{qs('#limitPriceGroup').style.display=qs('#tradeOrderType').value==='limit'?'block':'none';});
+  qs('#tradeSymbol')?.addEventListener('input',e=>e.target.value=e.target.value.toUpperCase());
+  qs('#tradeConfidence')?.addEventListener('input',e=>qs('#tradeConfidenceVal').textContent=e.target.value);
+  qs('#tradeVolatility')?.addEventListener('input',e=>qs('#tradeVolatilityVal').textContent=e.target.value);
+  qs('#tradeSyncScore')?.addEventListener('input',e=>qs('#tradeSyncVal').textContent=e.target.value);
+  qs('#runConfidence')?.addEventListener('click',runConfidence);qs('#confidenceRange')?.addEventListener('input',runConfidence);
+  qs('#runRoute')?.addEventListener('click',runRoute);qs('#routeType')?.addEventListener('change',runRoute);qs('#routeConfidence')?.addEventListener('input',runRoute);
+  qs('#runContain')?.addEventListener('click',runContain);qs('#volPressure')?.addEventListener('input',runContain);qs('#containMode')?.addEventListener('change',runContain);
+  qs('#runSync')?.addEventListener('click',runSync);['timingSyncInput','riskSyncInput','replaySyncInput','routeSyncInput'].forEach(id=>qs('#'+id)?.addEventListener('input',runSync));
+  qs('#runGate')?.addEventListener('click',runGate);qs('#executionRequest')?.addEventListener('change',runGate);qs('#systemSafety')?.addEventListener('change',runGate);
+  qs('#saveReplay')?.addEventListener('click',saveReplay);qs('#clearReplay')?.addEventListener('click',()=>{localStorage.removeItem('x26_replay');renderReplay();});
+  qs('#saveJournal')?.addEventListener('click',saveJournal);
+  qs('#killBtn')?.addEventListener('click',activateKill);
+  qs('#autoStartBtn')?.addEventListener('click',()=>{state.autoRunning?stopAutoEngine():startAutoEngine();});
+  qs('#congressStartBtn')?.addEventListener('click',()=>{const btn=qs('#congressStartBtn');btn.textContent.includes('Stop')?stopCongressEngine():startCongressEngine();});
+  qs('#congressScanBtn')?.addEventListener('click',()=>{fetch('https://precision-alpha-backend-hs6g.onrender.com/api/congress/scan',{method:'POST'}).then(()=>{toast('Scanning now...','success');setTimeout(loadCongressStatus,3000);});});
+  qs('#watchlistInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')addToWatchlist();});
+  loadFeed();runConfidence();runRoute();runContain();runSync();runGate();renderReplay();renderJournal();loadDashboard();
+});
+</script>
+</body>
+</html>

@@ -493,6 +493,21 @@ def congress_scan():
         if bought >= 3:
             break
 
+        # FIX: enforce the same max-shares-per-stock cap the Auto Engine uses.
+        # Without this check, congress_scan() kept re-buying the fallback
+        # tickers (NVDA/MSFT/AAPL/AMZN/GOOGL) day after day with no regard
+        # for existing position size, since trade_key only blocks the same
+        # ticker on the same calendar day — not across days.
+        try:
+            pos_res = requests.get(f"{ALPACA_BASE_URL}/positions/{ticker}", headers=alpaca_hdrs(), timeout=10)
+            current_qty = int(float(pos_res.json().get('qty', 0))) if pos_res.ok else 0
+        except:
+            current_qty = 0
+
+        if current_qty >= RULES['maxSharesPerStock']:
+            log_congress(f"⏭ {ticker} — max {RULES['maxSharesPerStock']} shares held, skipping")
+            continue
+
         try:
             qr = requests.get(f"{ALPACA_DATA_URL}/stocks/{ticker}/trades/latest", headers=alpaca_hdrs(), timeout=10)
             if not qr.ok:
@@ -501,8 +516,14 @@ def congress_scan():
             if not price or price < 1 or price > 1000:
                 continue
 
-            qty = max(1, int(RULES['maxPositionSize'] / price))
-            log_congress(f"📋 Copying congressional BUY: {ticker} @ ${price:.2f}")
+            # Cap the buy quantity so we never cross maxSharesPerStock,
+            # even when maxPositionSize / price would normally buy more.
+            room_left = RULES['maxSharesPerStock'] - current_qty
+            qty = max(1, min(room_left, int(RULES['maxPositionSize'] / price)))
+            if qty <= 0:
+                continue
+
+            log_congress(f"📋 Copying congressional BUY: {ticker} @ ${price:.2f} (holding {current_qty}/{RULES['maxSharesPerStock']})")
 
             or_ = requests.post(f"{ALPACA_BASE_URL}/orders", headers=alpaca_hdrs(),
                 json={"symbol": ticker, "qty": str(qty), "side": "buy", "type": "market", "time_in_force": "day"}, timeout=10)
